@@ -5,7 +5,7 @@
   "scripts": {
     "db:up": "docker-compose up -d postgres redis",
     "db:down": "docker-compose down",
-    "dev": "npm run db:up && concurrently \"npm run frontend:dev\" \"npm run backend:worker\"",
+    "dev": "concurrently \"npm run frontend:dev\" \"npm run backend:worker\"",
     "dev:full": "npm run dev",
     "frontend:dev": "cd frontend && npm run dev",
     "frontend:build": "cd frontend && npm run build",
