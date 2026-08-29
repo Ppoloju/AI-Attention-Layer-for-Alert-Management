@@ -14,14 +14,14 @@ loadRootEnv();
 function getDatabaseUrl(): string | undefined {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
 
-  const host = process.env.SUPABASE_DB_HOST;
-  const user = process.env.SUPABASE_DB_USER;
-  const password = process.env.SUPABASE_DB_PASSWORD;
-  const db = process.env.SUPABASE_DB_NAME || 'postgres';
-  const port = process.env.SUPABASE_DB_PORT || '5432';
+  const host = process.env.SUPABASE_DB_HOST || process.env.DB_HOST || 'localhost';
+  const user = process.env.SUPABASE_DB_USER || process.env.DB_USER || 'postgres';
+  const password = process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD;
+  const db = process.env.SUPABASE_DB_NAME || process.env.DB_NAME || 'postgres';
+  const port = process.env.SUPABASE_DB_PORT || process.env.DB_PORT || '5432';
 
-  if (host && user && password) {
-    return `postgresql://${user}:${encodeURIComponent(password)}@${host}:${port}/${db}`;
+  if (host && user && (password || host === 'localhost' || host === '127.0.0.1')) {
+    return `postgresql://${user}:${encodeURIComponent(password || '')}@${host}:${port}/${db}`;
   }
 
   return undefined;
