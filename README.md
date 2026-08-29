@@ -348,11 +348,11 @@ If the worker is down, events accumulate in Redis and are processed when it rest
 
 ## Future Scope
 
-1. **Correlation Engine** — Group related events into incidents by service, time window, and keywords
-2. **Risk Scoring** — Deterministic scoring based on severity, frequency, and service criticality
-3. **AI Triage** — Use AI to generate summaries, hypotheses, and suggested next steps
-4. **Dashboard** — Real-time UI for viewing signals, incidents, and event flow
-5. **Routing** — Direct events to the responsible team based on rules and AI classification
-6. **Integrations** — GitHub webhooks, Slack notifications, Jira ticket creation, Prometheus alerts
-7. **Authentication** — User auth and role-based access control
-8. **Feedback Loop** — Allow operators to mark events as resolved, improving AI over time
+1. **Correlation Engine** — Group related events into incidents by service, time window, and keywords.
+2. **Risk Scoring** — Deterministic scoring based on severity, frequency, and service criticality.
+3. **AI Triage** — Use AI to generate summaries, hypotheses, and suggested next steps.
+4. **Dashboard** — Real-time UI for viewing signals, incidents, and event flow.
+5. **Routing** — Direct events to the responsible team based on rules and AI classification.
+6. **Integrations** — GitHub webhooks, Slack notifications, Jira ticket creation, Prometheus alerts.
+7. **Authentication** — User auth and role-based access control.
+8. **Feedback Loop** — Allow operators to mark events as resolved, improving AI over time.
