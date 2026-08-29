@@ -62,8 +62,11 @@ SignalFlow is a full-stack TypeScript application that automatically ingests, co
 ## 🏗️ Architecture Layers
 
 ### 1. **Client Layer**
-- React 19 components with TypeScript
-- Server-side rendering via Next.js
+- React 19 components with TypeScript + `@base-ui/react` primitives
+- Server-side rendering via Next.js 16
+- Live Search, Status Tabs, and Priority Filters in Sidebar
+- Slide-over detailed triage review drawer (no page transitions needed)
+- In-memory process-wide shared offline mock fail-safes
 - Real-time dashboard with dark mode
 - Responsive design (mobile-first)
 
@@ -107,6 +110,7 @@ SignalFlow is a full-stack TypeScript application that automatically ingests, co
 react                    19.2.8      UI component library
 react-dom                19.2.8      React DOM rendering
 next                     16.3.3      Full-stack framework
+@base-ui/react           1.7.0       Accessible interactive primitives
 @upstash/redis           1.38.3      Cloud Redis client
 zod                      4.5.2       Schema validation
 dotenv                   17.4.2      Environment loading
