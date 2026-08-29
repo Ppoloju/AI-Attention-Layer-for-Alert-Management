@@ -640,37 +640,33 @@ MIT
 
 ### Completed
 
-- Event ingestion API with Zod validation
-- Redis queue (Upstash + local Docker)
-- Background worker with correlation engine
-- Deterministic risk scoring (P0–P3 priorities)
-- Groq AI triage (hypothesis, evidence, next steps)
-- Supabase PostgreSQL storage with auto-migration
-- Dashboard UI with live health status
-- Signal detail page with AI triage panel
-- Health endpoint with provider detection
-- 43 unit tests passing
+- Event ingestion API (POST /api/events)
+- Zod schema validation (shared between API and worker)
+- Redis queue (enqueue/dequeue)
+- Background worker (poll + persist)
+- PostgreSQL storage with indexes
+- Health endpoint (Redis + PostgreSQL)
+- Docker Compose (Redis + PostgreSQL)
+- Event querying (GET /api/events)
 
-### Planned
+### Not Implemented
 
-- External webhook integrations (GitHub, Slack, Jira, Prometheus)
-- Authentication and RBAC via Supabase Auth
-- Real-time signal updates (Supabase Realtime)
-- Feedback loop for operator resolution
-- Alert routing to on-call teams
+- Correlation engine
+- Risk scoring
+- AI/Grok integration
+- Dashboard UI
+- Event routing
+- External integrations (GitHub, Slack, Jira, Prometheus)
+- Authentication
+- Feedback loop
 
-## Scripts
+## Future Scope
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Start frontend + worker together |
-| `npm run frontend:dev` | Next.js dev server only |
-| `npm run backend:worker` | Background worker only |
-| `npm run frontend:build` | Production build |
-| `npm run test` | Run backend unit tests |
-| `npm run db:up` | Start local Docker services |
-| `npm run db:down` | Stop local Docker services |
-
-## License
-
-Private — SignalLabs AI HackDay project.
+1. **Correlation Engine** — Group related events into incidents by service, time window, and keywords
+2. **Risk Scoring** — Deterministic scoring based on severity, frequency, and service criticality
+3. **AI Triage** — Use AI to generate summaries, hypotheses, and suggested next steps
+4. **Dashboard** — Real-time UI for viewing signals, incidents, and event flow
+5. **Routing** — Direct events to the responsible team based on rules and AI classification
+6. **Integrations** — GitHub webhooks, Slack notifications, Jira ticket creation, Prometheus alerts
+7. **Authentication** — User auth and role-based access control
+8. **Feedback Loop** — Allow operators to mark events as resolved, improving AI over time
