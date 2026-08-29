@@ -223,79 +223,80 @@ export default function Dashboard() {
             </div>
           </div>
 
-        {loading && (
-          <div className="text-center py-24">
-            <div className="inline-block">
-              <div className="animate-spin text-4xl mb-4">⟳</div>
-              <p className="text-slate-500 dark:text-slate-400">Loading signals…</p>
+          {loading && (
+            <div className="text-center py-24">
+              <div className="inline-block">
+                <div className="animate-spin text-4xl mb-4">⟳</div>
+                <p className="text-slate-500 dark:text-slate-400">Loading signals…</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {error && (
-          <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl p-4 text-red-800 dark:text-red-200 text-sm mb-6 flex items-start gap-3">
-            <span className="text-xl">⚠️</span>
-            <div>
-              <p className="font-semibold">Error loading signals</p>
-              <p className="text-sm mt-1">{error}</p>
+          {error && (
+            <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl p-4 text-red-800 dark:text-red-200 text-sm mb-6 flex items-start gap-3">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <p className="font-semibold">Error loading signals</p>
+                <p className="text-sm mt-1">{error}</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {!loading && !error && signals.length === 0 && (
-          <div className="text-center py-24 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-            <div className="text-5xl mb-4">📭</div>
-            <p className="text-slate-700 dark:text-slate-300 font-semibold mb-2">No signals yet</p>
-            <p className="text-slate-600 dark:text-slate-400 text-sm max-w-md mx-auto">
-              Send 2+ events for the same service within 5 minutes to create a signal. 
-              Post to <code className="font-mono bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded text-xs">/api/events</code>
-            </p>
-          </div>
-        )}
+          {!loading && !error && signals.length === 0 && (
+            <div className="text-center py-24 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+              <div className="text-5xl mb-4">📭</div>
+              <p className="text-slate-700 dark:text-slate-300 font-semibold mb-2">No signals yet</p>
+              <p className="text-slate-600 dark:text-slate-400 text-sm max-w-md mx-auto">
+                Send 2+ events for the same service within 5 minutes to create a signal. 
+                Post to <code className="font-mono bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded text-xs">/api/events</code>
+              </p>
+            </div>
+          )}
 
-        {!loading && !error && signals.length > 0 && (
-          <div className="space-y-3">
-            {signals.map((s) => (
-              <Link
-                key={s.id}
-                href={`/signals/${s.id}`}
-                className="block rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 hover:shadow-lg hover:border-slate-300 dark:hover:border-slate-700 transition-all hover:scale-105 duration-200"
-              >
-                <div className="flex items-start gap-4">
-                  <span
-                    className={`inline-flex items-center justify-center w-12 h-12 rounded-lg text-sm font-bold shrink-0 ${priorityColor(s.priority)}`}
-                  >
-                    {s.priority}
-                  </span>
+          {!loading && !error && signals.length > 0 && (
+            <div className="space-y-3">
+              {signals.map((s) => (
+                <Link
+                  key={s.id}
+                  href={`/signals/${s.id}`}
+                  className="block rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 hover:shadow-lg hover:border-slate-300 dark:hover:border-slate-700 transition-all hover:scale-105 duration-200"
+                >
+                  <div className="flex items-start gap-4">
+                    <span
+                      className={`inline-flex items-center justify-center w-12 h-12 rounded-lg text-sm font-bold shrink-0 ${priorityColor(s.priority)}`}
+                    >
+                      {s.priority}
+                    </span>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-900 dark:text-slate-100 text-base truncate">
-                      {s.title}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-slate-900 dark:text-slate-100 text-base truncate">
+                        {s.title}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{s.service}</span>
+                        <span
+                          className={`text-xs px-2 py-1 rounded border capitalize font-medium ${severityBadge(s.max_severity)}`}
+                        >
+                          {s.max_severity}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {s.event_count} events • {timeAgo(s.created_at)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                      <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{s.service}</span>
-                      <span
-                        className={`text-xs px-2 py-1 rounded border capitalize font-medium ${severityBadge(s.max_severity)}`}
-                      >
-                        {s.max_severity}
-                      </span>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
-                        {s.event_count} events • {timeAgo(s.created_at)}
-                      </span>
+
+                    <div className="text-right shrink-0">
+                      <div className="text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">
+                        {s.risk_score}
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">risk score</div>
                     </div>
                   </div>
-
-                  <div className="text-right shrink-0">
-                    <div className="text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">
-                      {s.risk_score}
-                    </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">risk score</div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
