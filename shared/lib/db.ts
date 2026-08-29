@@ -121,6 +121,12 @@ export async function initializeDatabase() {
     // Triage columns (added in migration 004)
     await client.query(`
       DO $$ BEGIN
+        ALTER TABLE signals ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'open';
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$;
+    `);
+    await client.query(`
+      DO $$ BEGIN
         ALTER TABLE signals ADD COLUMN IF NOT EXISTS ai_hypothesis TEXT;
       EXCEPTION WHEN duplicate_column THEN NULL;
       END $$;
@@ -366,6 +372,51 @@ export async function getSignalById(signalId: string) {
     return {
       ...signalResult.rows[0],
       events: eventsResult.rows,
+    };
+  } finally {
+    client.release();
+  }
+}
+
+// ─── Stats and Actions ───────────────────────────────────────────────────────
+
+export async function updateSignalStatus(signalId: string, status: string) {
+  const client = await getPool().connect();
+  try {
+    const result = await client.query(
+      `UPDATE signals SET status = $1 WHERE id = $2 RETURNING *`,
+      [status, signalId]
+    );
+    return result.rows[0] ?? null;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getDashboardStats() {
+  const client = await getPool().connect();
+  try {
+    const eventsResult = await client.query(`SELECT COUNT(*) FROM events`);
+    const signalsResult = await client.query(`SELECT COUNT(*) FROM signals`);
+    const resolvedResult = await client.query(`SELECT COUNT(*) FROM signals WHERE status = 'resolved'`);
+    const openResult = await client.query(`SELECT COUNT(*) FROM signals WHERE status = 'open'`);
+
+    const totalEvents = parseInt(eventsResult.rows[0].count, 10) || 0;
+    const totalSignals = parseInt(signalsResult.rows[0].count, 10) || 0;
+    const resolvedSignals = parseInt(resolvedResult.rows[0].count, 10) || 0;
+    const openSignals = parseInt(openResult.rows[0].count, 10) || 0;
+
+    let noiseReduction = 0;
+    if (totalEvents > 0) {
+      noiseReduction = ((totalEvents - totalSignals) / totalEvents) * 100;
+    }
+
+    return {
+      totalEvents,
+      totalSignals,
+      resolvedSignals,
+      openSignals,
+      noiseReduction: parseFloat(noiseReduction.toFixed(1))
     };
   } finally {
     client.release();

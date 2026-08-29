@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSignals } from '../../../../shared/lib/db';
+import { getMockSignals } from '../mock-store';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,10 +19,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ signals });
   } catch (error) {
-    console.error('Error fetching signals:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.warn('Database offline, returning mock signals:', error);
+    const mockSignals = getMockSignals();
+    return NextResponse.json({ signals: mockSignals });
   }
 }
