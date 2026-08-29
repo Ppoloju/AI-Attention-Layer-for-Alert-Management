@@ -50,7 +50,7 @@ export async function initializeDatabase() {
         severity VARCHAR(20) NOT NULL,
         message TEXT NOT NULL,
         metadata JSONB DEFAULT '{}',
-        occurred_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
@@ -112,7 +112,7 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_events_service ON events(service);
       CREATE INDEX IF NOT EXISTS idx_events_severity ON events(severity);
       CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
-      CREATE INDEX IF NOT EXISTS idx_events_occurred_at ON events(occurred_at);
+      CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
       CREATE INDEX IF NOT EXISTS idx_signals_service ON signals(service);
       CREATE INDEX IF NOT EXISTS idx_signals_created_at ON signals(created_at);
       CREATE INDEX IF NOT EXISTS idx_signals_max_severity ON signals(max_severity);
@@ -133,7 +133,7 @@ export async function insertEvent(event: any) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `INSERT INTO events (source, event_type, service, severity, message, metadata, occurred_at)
+      `INSERT INTO events (source, event_type, service, severity, message, metadata, timestamp)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
@@ -157,7 +157,7 @@ export async function getEvents(limit = 50) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `SELECT * FROM events ORDER BY occurred_at DESC LIMIT $1`,
+      `SELECT * FROM events ORDER BY timestamp DESC LIMIT $1`,
       [validatedLimit]
     );
     return result.rows;
@@ -179,8 +179,8 @@ export async function getRecentEventsForService(
     const result = await client.query(
       `SELECT * FROM events
        WHERE service = $1
-         AND occurred_at >= NOW() - INTERVAL '1 minute' * $2
-       ORDER BY occurred_at ASC`,
+         AND timestamp >= NOW() - INTERVAL '1 minute' * $2
+       ORDER BY timestamp ASC`,
       [service, windowMinutes]
     );
     return result.rows;
@@ -313,7 +313,7 @@ export async function getSignalById(signalId: string) {
       `SELECT e.* FROM events e
        JOIN signal_events se ON e.id = se.event_id
        WHERE se.signal_id = $1
-       ORDER BY e.occurred_at ASC`,
+       ORDER BY e.timestamp ASC`,
       [signalId]
     );
 

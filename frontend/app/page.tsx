@@ -1,31 +1,29 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface Signal {
-  id: string;
+interface Event {
+  id: number;
+  source: string;
+  event_type: string;
   service: string;
-  title: string;
-  max_severity: string;
-  risk_score: number;
-  priority: string;
-  event_count: number;
-  start_time: string;
-  end_time: string;
+  severity: string;
+  timestamp: string;
+  message: string;
+  metadata: any;
   created_at: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function priorityColor(p: string): string {
-  switch (p) {
-    case 'P0': return 'bg-red-500 text-white';
-    case 'P1': return 'bg-orange-500 text-white';
-    case 'P2': return 'bg-yellow-500 text-black';
-    case 'P3': return 'bg-zinc-300 text-zinc-700';
+function severityColor(s: string): string {
+  switch (s) {
+    case 'critical': return 'bg-red-500 text-white';
+    case 'high': return 'bg-orange-500 text-white';
+    case 'medium': return 'bg-yellow-500 text-black';
+    case 'low': return 'bg-green-500 text-white';
     default: return 'bg-zinc-200 text-zinc-500';
   }
 }
@@ -43,17 +41,17 @@ function timeAgo(iso: string): string {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const [signals, setSignals] = useState<Signal[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/signals?limit=50')
+    fetch('/api/events?limit=50')
       .then(r => {
-        if (!r.ok) throw new Error('Failed to load signals');
+        if (!r.ok) throw new Error('Failed to load events');
         return r.json();
       })
-      .then(data => setSignals(data.signals))
+      .then(data => setEvents(data.events || data))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -67,14 +65,14 @@ export default function Dashboard() {
             SignalFlow
           </h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            What needs attention right now?
+            Event Ingestion Dashboard
           </p>
         </div>
 
         {/* Loading */}
         {loading && (
           <div className="text-center py-16 text-zinc-400">
-            Loading signals…
+            Loading events…
           </div>
         )}
 
@@ -86,46 +84,37 @@ export default function Dashboard() {
         )}
 
         {/* Empty */}
-        {!loading && !error && signals.length === 0 && (
+        {!loading && !error && events.length === 0 && (
           <div className="text-center py-16 text-zinc-400">
-            No signals yet. Events will appear here once processed.
+            No events yet. Send events to POST /api/events to see them here.
           </div>
         )}
 
-        {/* Signal list */}
-        {!loading && !error && signals.length > 0 && (
+        {/* Event list */}
+        {!loading && !error && events.length > 0 && (
           <div className="space-y-2">
-            {signals.map(s => (
-              <Link
-                key={s.id}
-                href={`/signals/${s.id}`}
-                className="block bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors"
+            {events.map(e => (
+              <div
+                key={e.id}
+                className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4"
               >
                 <div className="flex items-center gap-3">
-                  {/* Priority badge */}
-                  <span className={`inline-flex items-center justify-center w-8 h-8 rounded text-xs font-bold ${priorityColor(s.priority)}`}>
-                    {s.priority}
+                  {/* Severity badge */}
+                  <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-xs font-bold ${severityColor(e.severity)}`}>
+                    {e.severity}
                   </span>
 
-                  {/* Title + service */}
+                  {/* Event details */}
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-zinc-900 dark:text-zinc-100 truncate">
-                      {s.title}
+                      {e.message}
                     </div>
                     <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                      {s.service} · {s.event_count} events · {timeAgo(s.created_at)}
+                      {e.source} · {e.event_type} · {e.service} · {timeAgo(e.timestamp)}
                     </div>
-                  </div>
-
-                  {/* Risk score */}
-                  <div className="text-right shrink-0">
-                    <div className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                      {s.risk_score}
-                    </div>
-                    <div className="text-xs text-zinc-400">score</div>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}

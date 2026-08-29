@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS events (
   severity VARCHAR(20) NOT NULL,
   message TEXT NOT NULL,
   metadata JSONB DEFAULT '{}',
-  occurred_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -15,4 +15,4 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_service ON events(service);
 CREATE INDEX IF NOT EXISTS idx_events_severity ON events(severity);
 CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
-CREATE INDEX IF NOT EXISTS idx_events_occurred_at ON events(occurred_at);
+CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
