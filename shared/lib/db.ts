@@ -11,18 +11,38 @@ loadRootEnv();
 //
 // DATABASE_URL takes precedence when set.
 
+export function shouldUseLocalDatabase(): boolean {
+  if (process.env.USE_LOCAL_DATABASE === 'true') return true;
+  if (process.env.USE_SUPABASE_DATABASE === 'true') return false;
+  if (process.env.NODE_ENV === 'production') return false;
+
+  const hasLocalDbConfig = Boolean(
+    process.env.DB_HOST ||
+    process.env.DB_NAME ||
+    process.env.DB_USER ||
+    process.env.DB_PASSWORD
+  );
+
+  if (hasLocalDbConfig) return true;
+
+  const supabaseDbHost = process.env.SUPABASE_DB_HOST || '';
+  return /localhost|127\.0\.0\.1/.test(supabaseDbHost);
+}
+
 function getDatabaseUrl(): string | undefined {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  if (shouldUseLocalDatabase()) {
+    const host = process.env.DB_HOST || 'localhost';
+    const user = process.env.DB_USER || process.env.SUPABASE_DB_USER || 'postgres';
+    const password = process.env.DB_PASSWORD || process.env.SUPABASE_DB_PASSWORD || 'postgres';
+    const db = process.env.DB_NAME || process.env.SUPABASE_DB_NAME || 'signalflow';
+    const port = process.env.DB_PORT || process.env.SUPABASE_DB_PORT || '5432';
 
-  const host = process.env.SUPABASE_DB_HOST || process.env.DB_HOST || 'localhost';
-  const user = process.env.SUPABASE_DB_USER || process.env.DB_USER || 'postgres';
-  const password = process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD;
-  const db = process.env.SUPABASE_DB_NAME || process.env.DB_NAME || 'postgres';
-  const port = process.env.SUPABASE_DB_PORT || process.env.DB_PORT || '5432';
-
-  if (host && user && (password || host === 'localhost' || host === '127.0.0.1')) {
-    return `postgresql://${user}:${encodeURIComponent(password || '')}@${host}:${port}/${db}`;
+    if (host && user && (password || host === 'localhost' || host === '127.0.0.1')) {
+      return `postgresql://${user}:${encodeURIComponent(password || '')}@${host}:${port}/${db}`;
+    }
   }
+
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
 
   return undefined;
 }
