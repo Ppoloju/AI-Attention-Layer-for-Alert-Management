@@ -98,9 +98,9 @@ function toISOString(val: string | Date): string {
 
 function generateSignalId(service: string, events: EventRow[]): string {
   const sorted = [...events].sort(
-    (a, b) => new Date(toISOString(a.occurred_at)).getTime() - new Date(toISOString(b.occurred_at)).getTime()
+    (a, b) => new Date(toISOString(a.timestamp)).getTime() - new Date(toISOString(b.timestamp)).getTime()
   );
-  const start = toISOString(sorted[0].occurred_at).replace(/[^0-9]/g, '').slice(0, 14);
+  const start = toISOString(sorted[0].timestamp).replace(/[^0-9]/g, '').slice(0, 14);
   const hash = events.length.toString(36);
   return `sig-${service}-${start}-${hash}`;
 }
@@ -127,7 +127,7 @@ export interface EventRow {
   severity: string;
   message: string;
   metadata: Record<string, unknown>;
-  occurred_at: string;
+  timestamp: string;
   created_at: string;
 }
 
@@ -188,7 +188,7 @@ function correlateServiceEvents(
 ): SignalGroup[] {
   // Sort by timestamp ascending
   const sorted = [...events].sort(
-    (a, b) => new Date(toISOString(a.occurred_at)).getTime() - new Date(toISOString(b.occurred_at)).getTime()
+    (a, b) => new Date(toISOString(a.timestamp)).getTime() - new Date(toISOString(b.timestamp)).getTime()
   );
 
   const timeWindowMs = cfg.timeWindowMinutes * 60 * 1000;
@@ -200,14 +200,14 @@ function correlateServiceEvents(
   for (let i = 0; i < sorted.length; i++) {
     if (assigned.has(sorted[i].id)) continue;
 
-    const groupStart = new Date(toISOString(sorted[i].occurred_at)).getTime();
+    const groupStart = new Date(toISOString(sorted[i].timestamp)).getTime();
     const currentGroup: EventRow[] = [sorted[i]];
     assigned.add(sorted[i].id);
 
     for (let j = i + 1; j < sorted.length; j++) {
       if (assigned.has(sorted[j].id)) continue;
 
-      const candidateTime = new Date(toISOString(sorted[j].occurred_at)).getTime();
+      const candidateTime = new Date(toISOString(sorted[j].timestamp)).getTime();
       const withinWindow = candidateTime - groupStart <= timeWindowMs;
 
       if (!withinWindow) continue;
@@ -234,7 +234,7 @@ function correlateServiceEvents(
   return groups
     .filter(g => g.length >= cfg.minEventsForSignal)
     .map(group => {
-      const timestamps = group.map(e => new Date(toISOString(e.occurred_at)).getTime());
+      const timestamps = group.map(e => new Date(toISOString(e.timestamp)).getTime());
       const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
       const maxSev = group.reduce((worst, e) => {
         const rank = severityOrder[e.severity as keyof typeof severityOrder] ?? 4;

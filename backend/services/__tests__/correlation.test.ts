@@ -15,7 +15,7 @@ function makeEvent(overrides: Partial<EventRow> & { id: number }): EventRow {
     severity: 'high',
     message: 'Something went wrong',
     metadata: {},
-    occurred_at: '2026-08-29T10:00:00Z',
+    timestamp: '2026-08-29T10:00:00Z',
     created_at: '2026-08-29T10:00:01Z',
     ...overrides,
   };
@@ -61,19 +61,19 @@ describe('correlateEvents', () => {
           id: 1,
           event_type: 'database_error',
           message: 'database connection pool exhausted',
-          occurred_at: '2026-08-29T10:00:00Z',
+          timestamp: '2026-08-29T10:00:00Z',
         }),
         makeEvent({
           id: 2,
           event_type: 'http_error',
           message: 'HTTP 500 responses increasing',
-          occurred_at: '2026-08-29T10:01:00Z',
+          timestamp: '2026-08-29T10:01:00Z',
         }),
         makeEvent({
           id: 3,
           event_type: 'latency',
           message: 'p95 latency increased',
-          occurred_at: '2026-08-29T10:02:00Z',
+          timestamp: '2026-08-29T10:02:00Z',
         }),
       ];
 
@@ -94,28 +94,28 @@ describe('correlateEvents', () => {
           service: 'payment-api',
           event_type: 'error',
           message: 'database connection failed',
-          occurred_at: '2026-08-29T10:00:00Z',
+          timestamp: '2026-08-29T10:00:00Z',
         }),
         makeEvent({
           id: 2,
           service: 'payment-api',
           event_type: 'latency',
           message: 'response times degraded',
-          occurred_at: '2026-08-29T10:01:00Z',
+          timestamp: '2026-08-29T10:01:00Z',
         }),
         makeEvent({
           id: 3,
           service: 'auth-service',
           event_type: 'error',
           message: 'authentication timeout occurred',
-          occurred_at: '2026-08-29T10:00:30Z',
+          timestamp: '2026-08-29T10:00:30Z',
         }),
         makeEvent({
           id: 4,
           service: 'auth-service',
           event_type: 'warning',
           message: 'slow token validation',
-          occurred_at: '2026-08-29T10:01:30Z',
+          timestamp: '2026-08-29T10:01:30Z',
         }),
       ];
 
@@ -134,13 +134,13 @@ describe('correlateEvents', () => {
           id: 1,
           event_type: 'error',
           message: 'connection failed',
-          occurred_at: '2026-08-29T10:00:00Z',
+          timestamp: '2026-08-29T10:00:00Z',
         }),
         makeEvent({
           id: 2,
           event_type: 'error',
           message: 'connection failed again',
-          occurred_at: '2026-08-29T11:00:00Z', // 1 hour later
+          timestamp: '2026-08-29T11:00:00Z', // 1 hour later
         }),
       ];
 
@@ -158,13 +158,13 @@ describe('correlateEvents', () => {
           id: 1,
           event_type: 'error',
           message: 'payment gateway unreachable',
-          occurred_at: '2026-08-29T10:00:00Z',
+          timestamp: '2026-08-29T10:00:00Z',
         }),
         makeEvent({
           id: 2,
           event_type: 'latency',
           message: 'response times spiking',
-          occurred_at: '2026-08-29T10:02:00Z',
+          timestamp: '2026-08-29T10:02:00Z',
         }),
       ];
 
@@ -184,14 +184,14 @@ describe('correlateEvents', () => {
           service: 'payment-api',
           event_type: 'deployment',
           message: 'deployment started',
-          occurred_at: '2026-08-29T10:00:00Z',
+          timestamp: '2026-08-29T10:00:00Z',
         }),
         makeEvent({
           id: 2,
           service: 'payment-api',
           event_type: 'info',
           message: 'user signed up',
-          occurred_at: '2026-08-29T10:01:00Z',
+          timestamp: '2026-08-29T10:01:00Z',
         }),
       ];
 
@@ -217,7 +217,7 @@ describe('correlateEvents', () => {
           id: 1,
           event_type: 'error',
           message: 'something failed',
-          occurred_at: '2026-08-29T10:00:00Z',
+          timestamp: '2026-08-29T10:00:00Z',
         }),
       ];
 
@@ -231,7 +231,7 @@ describe('correlateEvents', () => {
           id: 1,
           event_type: 'error',
           message: 'something failed',
-          occurred_at: '2026-08-29T10:00:00Z',
+          timestamp: '2026-08-29T10:00:00Z',
         }),
       ];
 
@@ -248,13 +248,13 @@ describe('correlateEvents', () => {
           id: 1,
           event_type: 'error',
           message: 'first error',
-          occurred_at: '2026-08-29T10:00:00Z',
+          timestamp: '2026-08-29T10:00:00Z',
         }),
         makeEvent({
           id: 2,
           event_type: 'error',
           message: 'second error',
-          occurred_at: '2026-08-29T10:05:00Z', // Exactly 5 minutes
+          timestamp: '2026-08-29T10:05:00Z', // Exactly 5 minutes
         }),
       ];
 
@@ -269,13 +269,13 @@ describe('correlateEvents', () => {
           id: 1,
           event_type: 'error',
           message: 'first error',
-          occurred_at: '2026-08-29T10:00:00Z',
+          timestamp: '2026-08-29T10:00:00Z',
         }),
         makeEvent({
           id: 2,
           event_type: 'error',
           message: 'second error',
-          occurred_at: '2026-08-29T10:05:01Z', // 5 minutes 1 second
+          timestamp: '2026-08-29T10:05:01Z', // 5 minutes 1 second
         }),
       ];
 
@@ -291,28 +291,28 @@ describe('correlateEvents', () => {
           service: 'payment-api',
           event_type: 'error',
           message: 'database connection pool exhausted',
-          occurred_at: '2026-08-29T10:00:00Z',
+          timestamp: '2026-08-29T10:00:00Z',
         }),
         makeEvent({
           id: 2,
           service: 'payment-api',
           event_type: 'latency',
           message: 'response times increasing',
-          occurred_at: '2026-08-29T10:01:00Z',
+          timestamp: '2026-08-29T10:01:00Z',
         }),
         makeEvent({
           id: 3,
           service: 'auth-service',
           event_type: 'error',
           message: 'authentication timeout',
-          occurred_at: '2026-08-29T10:00:30Z',
+          timestamp: '2026-08-29T10:00:30Z',
         }),
         makeEvent({
           id: 4,
           service: 'auth-service',
           event_type: 'warning',
           message: 'slow token validation',
-          occurred_at: '2026-08-29T10:01:30Z',
+          timestamp: '2026-08-29T10:01:30Z',
         }),
       ];
 
@@ -334,14 +334,14 @@ describe('correlateEvents', () => {
           event_type: 'database_error',
           severity: 'medium',
           message: 'database connection pool exhausted',
-          occurred_at: '2026-08-29T10:00:00Z',
+          timestamp: '2026-08-29T10:00:00Z',
         }),
         makeEvent({
           id: 2,
           event_type: 'http_error',
           severity: 'critical',
           message: 'HTTP 500 responses increasing',
-          occurred_at: '2026-08-29T10:02:00Z',
+          timestamp: '2026-08-29T10:02:00Z',
         }),
       ];
 
@@ -367,7 +367,7 @@ describe('correlateEvents', () => {
           event_type: 'database_error',
           severity: 'high',
           message: 'database connection pool exhausted',
-          occurred_at: '2026-08-29T10:00:00Z',
+          timestamp: '2026-08-29T10:00:00Z',
         }),
         makeEvent({
           id: 2,
@@ -375,7 +375,7 @@ describe('correlateEvents', () => {
           event_type: 'http_error',
           severity: 'critical',
           message: 'HTTP 500 responses increasing',
-          occurred_at: '2026-08-29T10:01:00Z',
+          timestamp: '2026-08-29T10:01:00Z',
         }),
         makeEvent({
           id: 3,
@@ -383,7 +383,7 @@ describe('correlateEvents', () => {
           event_type: 'latency',
           severity: 'high',
           message: 'p95 latency increased',
-          occurred_at: '2026-08-29T10:02:00Z',
+          timestamp: '2026-08-29T10:02:00Z',
         }),
         // Group 2: auth-service timeout
         makeEvent({
@@ -392,7 +392,7 @@ describe('correlateEvents', () => {
           event_type: 'error',
           severity: 'medium',
           message: 'authentication service timeout',
-          occurred_at: '2026-08-29T10:00:30Z',
+          timestamp: '2026-08-29T10:00:30Z',
         }),
         makeEvent({
           id: 5,
@@ -400,7 +400,7 @@ describe('correlateEvents', () => {
           event_type: 'warning',
           severity: 'low',
           message: 'slow response from auth provider',
-          occurred_at: '2026-08-29T10:01:30Z',
+          timestamp: '2026-08-29T10:01:30Z',
         }),
       ];
 

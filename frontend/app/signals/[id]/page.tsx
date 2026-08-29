@@ -33,7 +33,7 @@ interface Event {
   severity: string;
   message: string;
   metadata: Record<string, unknown>;
-  occurred_at: string;
+  timestamp: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -210,7 +210,7 @@ export default function SignalDetailPage() {
                     {e.source}
                   </span>
                   <span className="text-xs text-zinc-400 ml-auto font-mono">
-                    {formatTime(e.occurred_at)}
+                    {formatTime(e.timestamp)}
                   </span>
                 </div>
                 <p className="text-sm text-zinc-700 dark:text-zinc-300">
