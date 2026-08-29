@@ -670,5 +670,284 @@ For issues:
 
 ---
 
+## 🔄 SignalFlow — Complete Internal Data Flow
+
+### Architectural Pipeline
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         1. DATA SOURCES                              │
+│                                                                     │
+│ Prometheus │ GitHub │ Slack │ Logs │ CI/CD │ Custom HTTP            │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               │ HTTP POST /api/events
+                               │ JSON Event
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       2. NEXT.JS API LAYER                          │
+│                                                                     │
+│  /api/events/route.ts                                               │
+│                                                                     │
+│  Request                                                            │
+│     │                                                               │
+│     ▼                                                               │
+│  request.json()                                                     │
+│     │                                                               │
+│     ▼                                                               │
+│  ZOD EVENTSCHEMA                                                    │
+│     │                                                               │
+│     ├── source       → string                                       │
+│     ├── event_type   → string                                       │
+│     ├── service      → string                                       │
+│     ├── severity     → critical/high/medium/low                     │
+│     ├── message      → string                                       │
+│     ├── metadata     → optional JSON object                         │
+│     └── timestamp    → ISO 8601 timestamp                           │
+│     │                                                               │
+│     ├──────── INVALID ────────→ HTTP 400                            │
+│     │                                                               │
+│     └──────── VALID ──────────→ Continue                            │
+│                                                                     │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               │ Validated Event
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       3. REDIS / UPSTASH                            │
+│                                                                     │
+│                     EVENT QUEUE                                     │
+│                                                                     │
+│       ┌────────┐   ┌────────┐   ┌────────┐   ┌────────┐             │
+│       │ Event1 │ → │ Event2 │ → │ Event3 │ → │ Event4 │ → ...       │
+│       └────────┘   └────────┘   └────────┘   └────────┘             │
+│                                                                     │
+│  Local: Redis Docker                                                │
+│  Production: Upstash Redis                                         │
+│                                                                     │
+│  Purpose: temporary buffer / asynchronous processing                │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               │ dequeue()
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       4. BACKGROUND WORKER                           │
+│                         Node.js + tsx                                │
+│                                                                     │
+│                         Event                                       │
+│                           │                                         │
+│                           ▼                                         │
+│                    ┌──────────────┐                                 │
+│                    │ ZOD VALIDATE │                                 │
+│                    │    AGAIN     │                                 │
+│                    └──────┬───────┘                                 │
+│                           │                                         │
+│                           ▼                                         │
+│                  ┌──────────────────┐                               │
+│                  │ DATABASE SERVICE  │                               │
+│                  │                  │                               │
+│                  │ INSERT event     │                               │
+│                  └────────┬─────────┘                               │
+│                           │                                         │
+│                           ▼                                         │
+│                  ┌──────────────────┐                               │
+│                  │ CORRELATION      │                               │
+│                  │ ENGINE           │                               │
+│                  │                  │                               │
+│                  │ service          │                               │
+│                  │ + time window    │                               │
+│                  │ + event count    │                               │
+│                  └────────┬─────────┘                               │
+│                           │                                         │
+│                     Related events?                                 │
+│                       /       \                                      │
+│                     NO         YES                                  │
+│                     │           │                                    │
+│                     │           ▼                                    │
+│                     │    Create / update                            │
+│                     │       SIGNAL                                  │
+│                     │           │                                    │
+│                     └───────────┤                                    │
+│                                 ▼                                    │
+│                       ┌─────────────────┐                            │
+│                       │ SCORING ENGINE  │                            │
+│                       │                 │                            │
+│                       │ Severity        │                            │
+│                       │      +          │                            │
+│                       │ Frequency       │                            │
+│                       │      ↓          │                            │
+│                       │ Risk Score 0-100│                            │
+│                       │      ↓          │                            │
+│                       │ P0 / P1 / P2/P3 │                            │
+│                       └────────┬────────┘                            │
+│                                │                                     │
+│                                ▼                                     │
+│                       ┌─────────────────┐                            │
+│                       │   GROQ AI       │                            │
+│                       │                 │                            │
+│                       │ Signal context  │                            │
+│                       │ + related events│                            │
+│                       │       ↓         │                            │
+│                       │ Llama model     │                            │
+│                       │       ↓         │                            │
+│                       │ Hypothesis      │                            │
+│                       │ Evidence        │                            │
+│                       │ Confidence      │                            │
+│                       │ Next Steps      │                            │
+│                       └────────┬────────┘                            │
+│                                │                                     │
+│                                ▼                                     │
+│                       ┌─────────────────┐                            │
+│                       │ DATABASE SERVICE │                            │
+│                       │                 │                            │
+│                       │ UPDATE SIGNAL   │                            │
+│                       │ + AI results    │                            │
+│                       └─────────────────┘                            │
+└────────────────────────────────┬────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       5. SUPABASE / POSTGRES                        │
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ EVENTS                                                        │  │
+│  │                                                               │  │
+│  │ id | source | service | severity | message | metadata | time  │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ SIGNALS                                                       │  │
+│  │                                                               │  │
+│  │ id | service | risk_score | priority | AI hypothesis | ...    │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ SIGNAL_EVENTS                                                 │  │
+│  │                                                               │  │
+│  │ signal_id ───────────────→ event_id                           │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               │ SQL queries
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         6. NEXT.JS API                              │
+│                                                                     │
+│ GET /api/signals                                                    │
+│          │                                                          │
+│          ├── Query Supabase                                         │
+│          ├── Sort risk_score DESC                                   │
+│          └── Return JSON                                            │
+│                                                                     │
+│ GET /api/signals/[id]                                               │
+│          │                                                          │
+│          ├── Get signal                                              │
+│          ├── Get related events                                      │
+│          └── Get AI analysis                                         │
+│                                                                     │
+│ GET /api/health                                                     │
+│          │                                                          │
+│          ├── Redis health                                            │
+│          ├── Database health                                         │
+│          ├── Supabase status                                         │
+│          ├── Groq configuration                                      │
+│          └── Queue size                                              │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               │ JSON
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         7. REACT DASHBOARD                          │
+│                                                                     │
+│  Search → Filter → Priority → Signal                               │
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ 🔴 P0  Payment API Incident                  Risk: 92         │  │
+│  │     5 correlated events                                      │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                              │                                      │
+│                              ▼                                      │
+│                       REVIEW SHEET                                  │
+│                                                                     │
+│  AI Hypothesis                                                     │
+│  Evidence                                                          │
+│  Confidence                                                        │
+│  Recommended Next Steps                                            │
+│  Raw Event Timeline                                                │
+│                                                                     │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+                         👨‍💻 ENGINEER
+                         Makes decision
+```
+
+### Flow Breakdown
+
+#### 1. Data Source
+A monitoring system generates an event. For example:
+```json
+{
+  "source": "prometheus",
+  "event_type": "alert",
+  "service": "payment-api",
+  "severity": "critical",
+  "message": "Connection pool exhausted",
+  "metadata": {
+    "active_connections": 100,
+    "pool_size": 100
+  },
+  "timestamp": "2026-08-29T10:00:00Z"
+}
+```
+This is raw operational data. Future connectors should normalize different vendor payloads into this common format.
+
+#### 2. Next.js API Layer
+The request comes into `POST /api/events`. The route handler does:
+- Parses the request JSON body stream.
+- Validates it against the **Zod EventSchema** (`shared/schemas/event.ts`).
+- Zod guarantees runtime checks (e.g. confirming `severity` is not numeric, dates are ISO 8601 strings, etc.).
+- If invalid, returns `HTTP 400`. If valid, continues.
+
+#### 3. Redis Queue
+After validation, the event is enqueued into Redis via `rpush('events:queue')`.
+- Redis acts as a temporary buffer to decouple ingestion from processing, protecting the app from massive spikes.
+
+#### 4. Background Worker
+The worker (`backend/queue/worker.ts` running on `tsx`) runs in a continuous poll loop:
+- Dequeues events using `lpop()`.
+- Validates the JSON payload using Zod.
+- Inserts the raw event into the PostgreSQL database.
+- Runs the **Correlation Engine** (`backend/services/correlation.ts`) to query database events for the same service within the 5-minute time window.
+- Clustered events are grouped into a new or updated **Signal**.
+
+#### 5. Scoring & Priority
+- Calculates a deterministic `risk_score` (Base severity + Event count × 5).
+- Maps risk scores to priorities: **P0** (80+), **P1** (60+), **P2** (40+), **P3** (<40).
+
+#### 6. Groq AI Triage
+- Constructs a structured context containing the Signal metrics and correlated event summaries.
+- Sends the payload to the **Groq Llama-3.1 model** to generate a root cause hypothesis, confidence level, evidence log, and immediate recommendations.
+- Saves the AI-enriched Signal status back to PostgreSQL.
+
+#### 7. Database Layer (Postgres)
+- Stores events in `events`.
+- Stores signals in `signals`.
+- Maps the relationships in `signal_events` junction table.
+
+#### 8. Next.js Read APIs
+- `GET /api/signals`: Queries Supabase, sorts signals by risk score, and returns JSON.
+- `GET /api/signals/[id]`: Returns a signal with all of its correlated events.
+- `GET /api/health`: Monitors database, Redis queue size, and AI provider config.
+
+#### 9. React Dashboard & Review Sheet
+- Renders the sidebar counters and dynamic filters (live search, status segment controls, priority toggles).
+- Displays cards ranked by risk score.
+- Clicking a card slides out the **Triage Review Sheet** to inspect AI insights and timeline logs.
+- Triggering "Resolve" updates state instantly and fires a PATCH to synchronize the database.
+
+---
+
 **Report Generated:** 2026-08-29  
 **Status:** PRODUCTION READY v1.0.0
+

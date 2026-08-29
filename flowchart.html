@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SignalFlow — Complete Internal Data Flow Chart</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background: #090d16;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.05) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.02) 0px, transparent 50%);
+      background-attachment: fixed;
+    }
+    
+    /* Sleek Grid Overlay */
+    .grid-overlay {
+      background-size: 40px 40px;
+      background-image: 
+        linear-gradient(to right, rgba(99, 102, 241, 0.015) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(99, 102, 241, 0.015) 1px, transparent 1px);
+    }
+
+    .glass {
+      background: rgba(13, 17, 28, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease-in-out;
+    }
+    
+    .glass:hover {
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      box-shadow: 0 4px 30px rgba(99, 102, 241, 0.05);
+    }
+
+    .glass-active {
+      background: rgba(99, 102, 241, 0.06);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.1), inset 0 0 8px rgba(99, 102, 241, 0.03);
+      transform: translateX(4px);
+    }
+
+    /* Connecting lines between nodes */
+    .node-connector {
+      position: relative;
+    }
+    .node-connector::after {
+      content: '';
+      position: absolute;
+      bottom: -32px;
+      left: 32px;
+      width: 2px;
+      height: 28px;
+      background: linear-gradient(to bottom, rgba(99, 102, 241, 0.25), transparent);
+    }
+
+    /* Flow line animations */
+    @keyframes dash {
+      to {
+        stroke-dashoffset: -40;
+      }
+    }
+    .animated-flow-line {
+      stroke-dasharray: 8 4;
+      animation: dash 2s linear infinite;
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090d16;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+
+    /* Pulse Glow */
+    .glow-dot {
+      box-shadow: 0 0 12px 2px rgba(99, 102, 241, 0.6);
+    }
+    .glow-text {
+      text-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
+    }
+  </style>
+</head>
+<body class="text-zinc-100 min-h-screen font-sans overflow-x-hidden selection:bg-indigo-500 selection:text-white grid-overlay relative">
+
+  <!-- Header Banner -->
+  <header class="border-b border-zinc-900 bg-zinc-950/70 backdrop-blur-md sticky top-0 z-30 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-400 shadow-lg shadow-indigo-500/20">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-black tracking-tight bg-gradient-to-r from-zinc-50 via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+            SignalFlow
+          </h1>
+          <span class="text-[9px] text-indigo-400 font-mono font-bold tracking-widest block uppercase leading-none mt-0.5">AI Attention Layer Data Pipeline</span>
+        </div>
+      </div>
+      
+      <!-- Presentation Mode Status Indicator -->
+      <div class="flex items-center gap-4 text-xs">
+        <div class="hidden sm:flex items-center gap-2 text-zinc-500 bg-zinc-900/50 border border-zinc-800/80 rounded-lg px-3 py-1 font-mono text-[10px]">
+          <span class="text-indigo-400 font-bold">Tip:</span> Use Left / Right Arrow keys to present
+        </div>
+        <span class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-bold uppercase tracking-wider text-[10px]">
+          Interactive Explainer
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Content Workspace -->
+  <main class="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6 relative">
+    
+    <!-- TOP SECTION: VISUAL FLOW MAP -->
+    <div class="glass p-5 rounded-2xl border border-zinc-800/50 w-full overflow-x-auto">
+      <div class="min-w-[800px] flex items-center justify-between px-6 py-2 relative">
+        
+        <!-- Connecting Line Background -->
+        <div class="absolute top-[32px] left-[48px] right-[48px] h-0.5 bg-zinc-800 -z-10"></div>
+        <div id="flow-line-progress" class="absolute top-[32px] left-[48px] h-0.5 bg-gradient-to-r from-indigo-500 to-indigo-300 transition-all duration-500 -z-10" style="width: 0%;"></div>
+
+        <!-- Node 1: Ingestion -->
+        <button onclick="selectNode(1)" id="map-node-1" class="flex flex-col items-center gap-2 group focus:outline-none relative">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center border-2 border-zinc-800 bg-zinc-950 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/50 transition-all duration-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          </div>
+          <span class="text-[11px] font-bold font-mono tracking-wider text-zinc-500 group-hover:text-zinc-300 transition-colors uppercase">1. Ingest</span>
+        </button>
+
+        <!-- Node 2: Validate -->
+        <button onclick="selectNode(2)" id="map-node-2" class="flex flex-col items-center gap-2 group focus:outline-none">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center border-2 border-zinc-800 bg-zinc-950 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/50 transition-all duration-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </div>
+          <span class="text-[11px] font-bold font-mono tracking-wider text-zinc-500 group-hover:text-zinc-300 transition-colors uppercase">2. Validate</span>
+        </button>
+
+        <!-- Node 3: Queue -->
+        <button onclick="selectNode(3)" id="map-node-3" class="flex flex-col items-center gap-2 group focus:outline-none">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center border-2 border-zinc-800 bg-zinc-950 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/50 transition-all duration-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+          </div>
+          <span class="text-[11px] font-bold font-mono tracking-wider text-zinc-500 group-hover:text-zinc-300 transition-colors uppercase">3. Buffer</span>
+        </button>
+
+        <!-- Node 4: Process -->
+        <button onclick="selectNode(4)" id="map-node-4" class="flex flex-col items-center gap-2 group focus:outline-none">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center border-2 border-zinc-800 bg-zinc-950 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/50 transition-all duration-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </div>
+          <span class="text-[11px] font-bold font-mono tracking-wider text-zinc-500 group-hover:text-zinc-300 transition-colors uppercase">4. Correlate</span>
+        </button>
+
+        <!-- Node 5: Score -->
+        <button onclick="selectNode(5)" id="map-node-5" class="flex flex-col items-center gap-2 group focus:outline-none">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center border-2 border-zinc-800 bg-zinc-950 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/50 transition-all duration-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          </div>
+          <span class="text-[11px] font-bold font-mono tracking-wider text-zinc-500 group-hover:text-zinc-300 transition-colors uppercase">5. Score</span>
+        </button>
+
+        <!-- Node 6: AI Triage -->
+        <button onclick="selectNode(6)" id="map-node-6" class="flex flex-col items-center gap-2 group focus:outline-none">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center border-2 border-zinc-800 bg-zinc-950 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/50 transition-all duration-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+          </div>
+          <span class="text-[11px] font-bold font-mono tracking-wider text-zinc-500 group-hover:text-zinc-300 transition-colors uppercase">6. AI Triage</span>
+        </button>
+
+        <!-- Node 7: Dashboard -->
+        <button onclick="selectNode(7)" id="map-node-7" class="flex flex-col items-center gap-2 group focus:outline-none">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center border-2 border-zinc-800 bg-zinc-950 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/50 transition-all duration-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          </div>
+          <span class="text-[11px] font-bold font-mono tracking-wider text-zinc-500 group-hover:text-zinc-300 transition-colors uppercase">7. Dashboard</span>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- MAIN TWO-COLUMN SPLIT -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+      
+      <!-- LEFT SIDE: VERTICAL PIPELINE TIMELINE -->
+      <div class="lg:col-span-5 flex flex-col gap-4">
+        <div class="px-2">
+          <h2 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
+            Pipeline Stages
+          </h2>
+          <p class="text-xs text-zinc-400 mt-1">Select a stage below to explore or explain it in detail.</p>
+        </div>
+
+        <!-- Stage List Container -->
+        <div class="flex flex-col gap-3">
+          
+          <!-- Stage 1 -->
+          <div id="node-1" onclick="selectNode(1)" class="glass hover:border-zinc-800/80 p-5 rounded-2xl cursor-pointer group node-connector relative">
+            <div class="flex items-start gap-4">
+              <div class="h-10 w-10 shrink-0 flex items-center justify-center rounded-xl bg-zinc-950 border border-zinc-900 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/30 transition-all duration-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">Stage 01</span>
+                  <span class="text-[10px] text-zinc-500 font-mono">Ingestion</span>
+                </div>
+                <h3 class="text-sm font-bold text-zinc-200 mt-0.5 group-hover:text-white transition-colors">External Data Sources</h3>
+                <p class="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  Raw alert logs streaming in from various external systems.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stage 2 -->
+          <div id="node-2" onclick="selectNode(2)" class="glass hover:border-zinc-800/80 p-5 rounded-2xl cursor-pointer group node-connector relative">
+            <div class="flex items-start gap-4">
+              <div class="h-10 w-10 shrink-0 flex items-center justify-center rounded-xl bg-zinc-950 border border-zinc-900 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/30 transition-all duration-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">Stage 02</span>
+                  <span class="text-[10px] text-zinc-500 font-mono">Validation Gateway</span>
+                </div>
+                <h3 class="text-sm font-bold text-zinc-200 mt-0.5 group-hover:text-white transition-colors">API Gateway & Verification</h3>
+                <p class="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  Incoming incidents are checked and verified for completeness.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stage 3 -->
+          <div id="node-3" onclick="selectNode(3)" class="glass hover:border-zinc-800/80 p-5 rounded-2xl cursor-pointer group node-connector relative">
+            <div class="flex items-start gap-4">
+              <div class="h-10 w-10 shrink-0 flex items-center justify-center rounded-xl bg-zinc-950 border border-zinc-900 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/30 transition-all duration-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">Stage 03</span>
+                  <span class="text-[10px] text-zinc-500 font-mono">Queue Buffer</span>
+                </div>
+                <h3 class="text-sm font-bold text-zinc-200 mt-0.5 group-hover:text-white transition-colors">Redis Message Queue</h3>
+                <p class="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  High-speed buffer queue to handle traffic bursts without lag.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stage 4 -->
+          <div id="node-4" onclick="selectNode(4)" class="glass hover:border-zinc-800/80 p-5 rounded-2xl cursor-pointer group node-connector relative">
+            <div class="flex items-start gap-4">
+              <div class="h-10 w-10 shrink-0 flex items-center justify-center rounded-xl bg-zinc-950 border border-zinc-900 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/30 transition-all duration-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">Stage 04</span>
+                  <span class="text-[10px] text-zinc-500 font-mono">Processor</span>
+                </div>
+                <h3 class="text-sm font-bold text-zinc-200 mt-0.5 group-hover:text-white transition-colors">Continuous Background Worker</h3>
+                <p class="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  Pulls from queue, saves to Postgres, and aggregates identical errors.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stage 5 -->
+          <div id="node-5" onclick="selectNode(5)" class="glass hover:border-zinc-800/80 p-5 rounded-2xl cursor-pointer group node-connector relative">
+            <div class="flex items-start gap-4">
+              <div class="h-10 w-10 shrink-0 flex items-center justify-center rounded-xl bg-zinc-950 border border-zinc-900 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/30 transition-all duration-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">Stage 05</span>
+                  <span class="text-[10px] text-zinc-500 font-mono">Triage Scoring</span>
+                </div>
+                <h3 class="text-sm font-bold text-zinc-200 mt-0.5 group-hover:text-white transition-colors">Deterministic Scoring Engine</h3>
+                <p class="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  Fast rules-based math scoring to sort alerts from P0 to P3.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stage 6 -->
+          <div id="node-6" onclick="selectNode(6)" class="glass hover:border-zinc-800/80 p-5 rounded-2xl cursor-pointer group node-connector relative">
+            <div class="flex items-start gap-4">
+              <div class="h-10 w-10 shrink-0 flex items-center justify-center rounded-xl bg-zinc-950 border border-zinc-900 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/30 transition-all duration-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">Stage 06</span>
+                  <span class="text-[10px] text-zinc-500 font-mono">LLM Brain</span>
+                </div>
+                <h3 class="text-sm font-bold text-zinc-200 mt-0.5 group-hover:text-white transition-colors">AI Triage (Llama 3.1)</h3>
+                <p class="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  AI reads alert context, summarizes causes, and generates checklists.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stage 7 -->
+          <div id="node-7" onclick="selectNode(7)" class="glass hover:border-zinc-800/80 p-5 rounded-2xl cursor-pointer group relative">
+            <div class="flex items-start gap-4">
+              <div class="h-10 w-10 shrink-0 flex items-center justify-center rounded-xl bg-zinc-950 border border-zinc-900 text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-500/30 transition-all duration-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">Stage 07</span>
+                  <span class="text-[10px] text-zinc-500 font-mono">UI Dashboard</span>
+                </div>
+                <h3 class="text-sm font-bold text-zinc-200 mt-0.5 group-hover:text-white transition-colors">Single-Page React Interface</h3>
+                <p class="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  Live UI console displaying prioritized events with review drawers.
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- RIGHT SIDE: PRESENTATION PANEL (DYNAMIC DETAILS) -->
+      <div class="lg:col-span-7 flex flex-col gap-4">
+        
+        <!-- Presentation Detail Container -->
+        <div class="glass rounded-2xl border border-zinc-800/50 flex-1 flex flex-col overflow-hidden min-h-[500px]">
+          
+          <!-- Mode Tabs & Header -->
+          <div class="border-b border-zinc-900 bg-zinc-950/40 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
+            <div>
+              <span id="detail-tag" class="text-xs font-mono font-bold text-indigo-400 uppercase tracking-widest">Stage Ingestion</span>
+              <h2 id="detail-title" class="text-lg font-black tracking-tight text-white mt-0.5">Select a stage</h2>
+            </div>
+            
+            <!-- EXPLAINER MODE TABS -->
+            <div class="flex p-1 bg-zinc-900/80 border border-zinc-800/80 rounded-xl shrink-0 self-start sm:self-auto">
+              <button onclick="toggleViewMode('simple')" id="btn-mode-simple" class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 flex items-center gap-1.5 focus:outline-none">
+                Simple Explain
+              </button>
+              <button onclick="toggleViewMode('technical')" id="btn-mode-technical" class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 flex items-center gap-1.5 focus:outline-none">
+                Technical Specs
+              </button>
+            </div>
+          </div>
+
+          <!-- Explainer Body -->
+          <div class="flex-1 overflow-y-auto p-6 space-y-4">
+            <div id="detail-badge-container" class="flex justify-between items-center hidden">
+              <span class="text-[10px] text-zinc-500 font-mono tracking-wider uppercase font-bold">Data Payload & Context</span>
+              <span id="detail-badge" class="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[9px] text-indigo-300 font-mono uppercase font-bold"></span>
+            </div>
+            
+            <!-- Dynamic Content Slot -->
+            <div id="detail-body" class="text-sm text-zinc-300 leading-relaxed space-y-4">
+              <!-- Initial Welcome View -->
+              <div class="flex flex-col items-center justify-center h-[350px] text-center p-6 space-y-4">
+                <div class="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 animate-pulse">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="font-extrabold text-base text-zinc-200">Interactive Pipeline Sandbox</h3>
+                  <p class="text-xs text-zinc-400 mt-1.5 max-w-sm mx-auto">
+                    Click any node in the list or the flow map above to explore how alerts travel from systems to dashboard views.
+                  </p>
+                </div>
+                <button onclick="selectNode(1)" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-750 text-xs font-bold shadow-md shadow-indigo-600/10 transition-all">
+                  Start Explainer Walkthrough
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Presentation Walkthrough Footer Controls -->
+          <div class="border-t border-zinc-900 bg-zinc-950/20 px-5 py-4 flex items-center justify-between shrink-0">
+            <span class="text-[10px] text-zinc-500 font-mono" id="walkthrough-progress">Step 0 / 7</span>
+            <div class="flex gap-2">
+              <button onclick="prevStep()" id="btn-prev" class="px-4 py-2 text-xs font-bold rounded-xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800/80 disabled:opacity-40 disabled:hover:bg-zinc-900/60 transition-colors" disabled>
+                ← Back
+              </button>
+              <button onclick="nextStep()" id="btn-next" class="px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 disabled:opacity-40 shadow-md shadow-indigo-600/10 transition-colors">
+                Next Step →
+              </button>
+            </div>
+          </div>
+
+        </div>
+        
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    // System Ingestion Flow Content Store
+    const nodeDetails = {
+      1: {
+        tag: 'Stage 01 — Ingestion Inflow',
+        badge: 'Telemetry Alert Stream',
+        title: 'External Monitoring Data Sources',
+        simple: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">Our pipeline begins by collecting raw alert logs from external systems (like Prometheus or Slack webhooks) as they happen.</p>
+            
+            <div class="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+              <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">The Post Office Analogy</h4>
+              <p class="text-xs text-zinc-400 leading-relaxed">Imagine a post office receiving thousands of packages in different shapes, sizes, and languages. We must sort and standardize them before we can process them.</p>
+            </div>
+
+            <div class="space-y-2">
+              <h4 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">Key Concepts:</h4>
+              <ul class="list-disc pl-4 space-y-1 text-xs text-zinc-400">
+                <li><strong class="text-zinc-200">Unified Input:</strong> Accepts alerts from different monitoring sources.</li>
+                <li><strong class="text-zinc-200">Raw Format:</strong> The raw alerts are cluttered and unstructured.</li>
+                <li><strong class="text-zinc-200">Next Step:</strong> Sends the raw data to the gateway for validation.</li>
+              </ul>
+            </div>
+          </div>
+        `,
+        technical: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">Raw alert telemetry payload enters the stack via an HTTP <code class="font-mono text-zinc-200">POST</code> request containing details regarding the origin event.</p>
+            
+            <div class="space-y-1.5">
+              <span class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 font-mono">Normalized Payload JSON Contract:</span>
+              <pre class="text-xs p-3.5 rounded-lg bg-zinc-950 border border-zinc-900/80 text-emerald-400 font-mono overflow-x-auto">{
+  "source": "prometheus",
+  "event_type": "alert",
+  "service": "payment-api",
+  "severity": "critical",
+  "message": "Connection pool exhausted",
+  "metadata": {
+    "active_connections": 100,
+    "pool_size": 100
+  },
+  "timestamp": "2026-08-29T10:00:00Z"
+}</pre>
+            </div>
+            
+            <div class="p-3.5 rounded-lg bg-zinc-900/40 border border-zinc-800/60 text-xs text-zinc-400 leading-relaxed">
+              <strong class="text-zinc-300">Integration:</strong> Monitoring agents (e.g. Alertmanager webhooks or raw script executions) must fire network packets containing this key layout.
+            </div>
+          </div>
+        `
+      },
+      2: {
+        tag: 'Stage 02 — Gateway Validation',
+        badge: 'Zod Payload Validation',
+        title: 'API Gateway Runtime Checks',
+        simple: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">Every incoming alert is immediately checked to ensure it contains all required information and is correctly formatted.</p>
+            
+            <div class="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+              <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">The Security Guard Analogy</h4>
+              <p class="text-xs text-zinc-400 leading-relaxed">Think of a security guard at a gate checking IDs. If someone doesn't have a valid ID, they are turned away. Only visitors with proper credentials can enter.</p>
+            </div>
+
+            <div class="space-y-2">
+              <h4 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">Key Concepts:</h4>
+              <ul class="list-disc pl-4 space-y-1 text-xs text-zinc-400">
+                <li><strong class="text-zinc-200">Data Safety:</strong> Stops incomplete or corrupted data from entering the database.</li>
+                <li><strong class="text-zinc-200">Fast Feedback:</strong> Instantly rejects bad requests so monitoring tools know there is an issue.</li>
+                <li><strong class="text-zinc-200">Standard Output:</strong> Guarantees that all downstream stages receive clean, predictable data.</li>
+              </ul>
+            </div>
+          </div>
+        `,
+        technical: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">Incoming payloads land on the API Gateway at <code class="font-mono text-indigo-300">POST /api/events</code>. The controller validates inputs against a rigid Zod validator schema runtime.</p>
+            
+            <div class="space-y-1.5">
+              <span class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 font-mono">Zod Schema Code:</span>
+              <pre class="text-xs p-3.5 rounded-lg bg-zinc-950 border border-zinc-900/80 text-indigo-300 font-mono overflow-x-auto">export const EventSchema = z.object({
+  source: z.string().min(1),
+  event_type: z.string().min(1),
+  service: z.string().min(1),
+  severity: z.enum(['critical', 'high', 'medium', 'low']),
+  message: z.string().min(1),
+  metadata: z.record(z.any()).optional(),
+  timestamp: z.string().datetime(),
+});</pre>
+            </div>
+            
+            <div class="p-3.5 rounded-lg bg-zinc-900/40 border border-zinc-800/60 text-xs text-zinc-400 leading-relaxed">
+              If validation fails, the handler bypasses Redis queue pushing and returns a standard HTTP <code class="font-mono text-rose-400">400 Bad Request</code> response with exact validation errors.
+            </div>
+          </div>
+        `
+      },
+      3: {
+        tag: 'Stage 03 — Decoupling Queue',
+        badge: 'Redis Buffer Queue',
+        title: 'Traffic Buffering & Redis Queuing',
+        simple: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">Valid alerts are placed in a high-speed temporary queue. This buffers traffic during busy periods, preventing system overload.</p>
+            
+            <div class="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+              <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">The Waiting Room Analogy</h4>
+              <p class="text-xs text-zinc-400 leading-relaxed">Think of a popular store. If fifty customers arrive at once, the cashier cannot serve them all at the exact same second. Instead, customers form a line and are served one by one.</p>
+            </div>
+
+            <div class="space-y-2">
+              <h4 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">Key Concepts:</h4>
+              <ul class="list-disc pl-4 space-y-1 text-xs text-zinc-400">
+                <li><strong class="text-zinc-200">Traffic Control:</strong> Absorbs sudden spikes in alert traffic without crashing the system.</li>
+                <li><strong class="text-zinc-200">Fast Responses:</strong> Lets the API confirm receipt of the alert instantly, performing heavy tasks later.</li>
+                <li><strong class="text-zinc-200">Memory Buffer:</strong> Uses Redis to safely queue tasks in memory.</li>
+              </ul>
+            </div>
+          </div>
+        `,
+        technical: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">Valid events are buffered to decouple client ingestion from disk database operations, utilizing a Redis List structure via REST commands.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 font-mono text-xs">
+              <div class="p-3 bg-zinc-950 border border-zinc-900 rounded-xl">
+                <span class="block text-[9px] text-zinc-500 uppercase tracking-wider">Storage Target</span>
+                <span class="text-indigo-400">Redis List: events:queue</span>
+              </div>
+              <div class="p-3 bg-zinc-950 border border-zinc-900 rounded-xl">
+                <span class="block text-[9px] text-zinc-500 uppercase tracking-wider">Client Call</span>
+                <span class="text-emerald-400">RPUSH events:queue [event]</span>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-lg bg-zinc-900/40 border border-zinc-800/60 text-xs text-zinc-400 leading-normal">
+              By using memory buffers, API endpoints return a <code class="font-mono text-zinc-200">202 Accepted</code>. This decouples transaction logic, safeguarding performance levels.
+            </div>
+          </div>
+        `
+      },
+      4: {
+        tag: 'Stage 04 — Background Worker',
+        badge: 'Continuous Event Processing',
+        title: 'Background Worker & Clustered Correlation',
+        simple: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">A continuous background worker takes alerts from the queue, saves them to the database, and groups related events together.</p>
+            
+            <div class="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+              <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">The Alert Folder Analogy</h4>
+              <p class="text-xs text-zinc-400 leading-relaxed">If a pipe breaks in an apartment building, ten residents might call to report a leak. Instead of sending ten plumbers, we group the calls into one ticket: 'Main water leak' and send one plumber.</p>
+            </div>
+
+            <div class="space-y-2">
+              <h4 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">Key Concepts:</h4>
+              <ul class="list-disc pl-4 space-y-1 text-xs text-zinc-400">
+                <li><strong class="text-zinc-200">Alert Grouping:</strong> Combines identical or highly related events within a 5-minute window.</li>
+                <li><strong class="text-zinc-200">Data Persistence:</strong> Saves every single alert permanently in PostgreSQL for logs and audits.</li>
+                <li><strong class="text-zinc-200">Noise Reduction:</strong> Reduces hundreds of separate alerts into a few meaningful alerts.</li>
+              </ul>
+            </div>
+          </div>
+        `,
+        technical: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">A worker script running on the <code class="font-mono text-zinc-200">tsx</code> engine checks the Redis list queue. It pops events, inserts them into PostgreSQL, and initiates correlation grouping rules.</p>
+            
+            <div class="p-3.5 bg-zinc-950 border border-zinc-900/80 rounded-xl space-y-2 text-xs font-mono">
+              <span class="block text-[10px] text-zinc-500 uppercase tracking-wider">Correlation Clustering Schema:</span>
+              <div class="flex justify-between border-b border-zinc-900 pb-1">
+                <span class="text-indigo-400">Query Function:</span> 
+                <span class="text-zinc-300">LPOP events:queue</span>
+              </div>
+              <div class="flex justify-between border-b border-zinc-900 pb-1">
+                <span class="text-indigo-400">Match Pattern:</span> 
+                <span class="text-zinc-300">service = incoming.service</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-indigo-400">Window Limit:</span> 
+                <span class="text-zinc-300">created_at >= NOW() - 5m</span>
+              </div>
+            </div>
+
+            <p class="text-xs text-zinc-400 leading-normal">If a matched active alert group (Signal) exists, the worker attaches the raw event and updates the count. If none is found, a new Signal is generated in Postgres.</p>
+          </div>
+        `
+      },
+      5: {
+        tag: 'Stage 05 — Prioritization Scoring',
+        badge: 'Scoring Engine Rule Set',
+        title: 'Rule-Based Deterministic Risk Scoring',
+        simple: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">The scoring engine calculates the priority of alert groups using clear, mathematically defined rules (from P0 to P3).</p>
+            
+            <div class="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+              <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">The Emergency Room Analogy</h4>
+              <p class="text-xs text-zinc-400 leading-relaxed">A triage nurse evaluates patients. Severe cases get treated immediately, while minor scratches wait. The nurse follows fixed rules to decide priority quickly.</p>
+            </div>
+
+            <div class="space-y-2">
+              <h4 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">Key Concepts:</h4>
+              <ul class="list-disc pl-4 space-y-1 text-xs text-zinc-400">
+                <li><strong class="text-zinc-200">Instant Scoring:</strong> Priority is calculated instantly using code, without needing slow AI queries.</li>
+                <li><strong class="text-zinc-200">Scaled Impact:</strong> More frequent alerts automatically raise the priority score.</li>
+                <li><strong class="text-zinc-200">Clear Tiers:</strong> Categorizes alerts into P0 (critical), P1 (high), P2 (medium), and P3 (low).</li>
+              </ul>
+            </div>
+          </div>
+        `,
+        technical: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">Priority classifications are evaluated deterministically in-code, ensuring reliable routing before sending payloads to LLMs.</p>
+            
+            <div class="space-y-1.5">
+              <span class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 font-mono">Mathematical Scoring Formula:</span>
+              <pre class="text-xs p-3.5 rounded-lg bg-zinc-950 border border-zinc-900/80 text-amber-400 font-mono overflow-x-auto">const baseScore = {
+  critical: 40,
+  high: 30,
+  medium: 20,
+  low: 10
+}[maxSeverity];
+
+const calculatedScore = baseScore + (clusterSize * 5);
+const finalScore = Math.min(100, calculatedScore);</pre>
+            </div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 font-mono text-[10px] text-center">
+              <div class="p-2 bg-rose-950/20 border border-rose-900/35 rounded-lg text-rose-400 font-bold">P0 (Score 80+)</div>
+              <div class="p-2 bg-amber-950/20 border border-amber-900/35 rounded-lg text-amber-400 font-bold">P1 (Score 60+)</div>
+              <div class="p-2 bg-blue-950/20 border border-blue-900/35 rounded-lg text-blue-400 font-bold">P2 (Score 40+)</div>
+              <div class="p-2 bg-zinc-900/60 border border-zinc-800 rounded-lg text-zinc-400 font-bold">P3 (Score &lt; 40)</div>
+            </div>
+          </div>
+        `
+      },
+      6: {
+        tag: 'Stage 06 — AI Triage Engine',
+        badge: 'LLM Reasoning Layer',
+        title: 'AI Root Cause Analysis & Playbooks',
+        simple: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">The grouped alert is analyzed by a smart AI model to explain the root cause and generate a step-by-step resolution checklist.</p>
+            
+            <div class="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+              <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">The Specialist Doctor Analogy</h4>
+              <p class="text-xs text-zinc-400 leading-relaxed">After the nurse prioritizes a patient, a specialist doctor reviews the case, diagnoses the root cause, and writes a recovery plan.</p>
+            </div>
+
+            <div class="space-y-2">
+              <h4 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">Key Concepts:</h4>
+              <ul class="list-disc pl-4 space-y-1 text-xs text-zinc-400">
+                <li><strong class="text-zinc-200">Automated Analysis:</strong> Llama 3.1 reads the raw error logs to find the root cause.</li>
+                <li><strong class="text-zinc-200">Recovery Steps:</strong> Generates an action plan for on-call developers to fix the bug quickly.</li>
+                <li><strong class="text-zinc-200">Pre-calculated:</strong> AI insights are stored in the database so pages load instantly.</li>
+              </ul>
+            </div>
+          </div>
+        `,
+        technical: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">Sends the correlated Signal parameters to the Groq cloud inference engine using system instructions targeting Llama-3.1-8b-instant.</p>
+            
+            <div class="space-y-1.5">
+              <span class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 font-mono">Response Schema JSON Payload:</span>
+              <pre class="text-xs p-3.5 rounded-lg bg-zinc-950 border border-zinc-900/80 text-indigo-300 font-mono overflow-x-auto">{
+  "ai_hypothesis": "Database pool saturation...",
+  "ai_confidence": "high",
+  "ai_evidence": [
+    "Active connections maxed at 100/100"
+  ],
+  "ai_next_steps": [
+    "Scale replica connection pool size"
+  ]
+}</pre>
+            </div>
+            
+            <p class="text-xs text-zinc-400 leading-normal">The generated JSON payload is written back directly to the Signal record in PostgreSQL. The UI displays this context without calling Groq during user actions.</p>
+          </div>
+        `
+      },
+      7: {
+        tag: 'Stage 07 — UI Console Dashboard',
+        badge: 'React Dashboard Client',
+        title: 'Incident Console & Details Review',
+        simple: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">Human engineers view the prioritized alerts in a clean dashboard, read the AI-generated explanations, and resolve the issues.</p>
+            
+            <div class="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+              <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">The Control Room Analogy</h4>
+              <p class="text-xs text-zinc-400 leading-relaxed">Like a control room panel at a power plant, engineers see active issues on screen, click any item to see the details, and mark it resolved once fixed.</p>
+            </div>
+
+            <div class="space-y-2">
+              <h4 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">Key Concepts:</h4>
+              <ul class="list-disc pl-4 space-y-1 text-xs text-zinc-400">
+                <li><strong class="text-zinc-200">Priority Console:</strong> Shows active alerts sorted by their priority level.</li>
+                <li><strong class="text-zinc-200">Detail Drawers:</strong> Side panels slide open to show full debug info without changing pages.</li>
+                <li><strong class="text-zinc-200">Live Actions:</strong> Engineers can resolve or update alerts with a single click.</li>
+              </ul>
+            </div>
+          </div>
+        `,
+        technical: `
+          <div class="space-y-4">
+            <p class="text-zinc-300">A React single-page frontend communicates with Next.js API endpoints to render the real-time prioritization interface.</p>
+            
+            <div class="p-3.5 bg-zinc-950 border border-zinc-900/80 rounded-xl space-y-2 text-xs font-mono">
+              <span class="block text-[10px] text-zinc-500 uppercase tracking-wider">Active Client-Side State Nodes:</span>
+              <div class="space-y-1 text-zinc-400">
+                <div>• <code class="text-indigo-300 font-bold">searchQuery:</code> filters display grid parameters</div>
+                <div>• <code class="text-indigo-300 font-bold">statusFilter:</code> segments 'Active' vs 'Resolved' views</div>
+                <div>• <code class="text-indigo-300 font-bold">selectedSignalId:</code> toggles sliding sheet state</div>
+              </div>
+            </div>
+            
+            <p class="text-xs text-zinc-400 leading-relaxed">Includes real-time polling to retrieve Postgres table changes, ensuring the on-call engineer has immediate visibility of live anomalies.</p>
+          </div>
+        `
+      }
+    };
+
+    let currentStep = 0;
+    let explainerMode = 'simple'; // 'simple' | 'technical'
+
+    // Document Ready Initializer
+    document.addEventListener("DOMContentLoaded", () => {
+      // Setup initial empty state representation or start with Step 1
+      selectNode(1);
+      
+      // Bind Keyboard Events
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowRight") {
+          nextStep();
+        } else if (e.key === "ArrowLeft") {
+          prevStep();
+        }
+      });
+    });
+
+    function selectNode(nodeId) {
+      currentStep = nodeId;
+
+      // Update Top Timeline Progress Line
+      const progressPercent = ((nodeId - 1) / 6) * 100;
+      document.getElementById('flow-line-progress').style.width = `${progressPercent}%`;
+
+      // Reset Map Nodes and Vertical Cards styles
+      for (let i = 1; i <= 7; i++) {
+        // Map Nodes
+        const mapNode = document.getElementById(`map-node-${i}`);
+        if (mapNode) {
+          const circle = mapNode.querySelector('div');
+          circle.className = "w-12 h-12 rounded-xl flex items-center justify-center border-2 transition-all duration-300 " + 
+            (i <= nodeId 
+              ? "border-indigo-500 bg-indigo-950/20 text-indigo-400 shadow-md shadow-indigo-500/10" 
+              : "border-zinc-800 bg-zinc-950 text-zinc-400");
+          
+          const label = mapNode.querySelector('span');
+          label.className = "text-[11px] font-bold font-mono tracking-wider transition-colors uppercase " +
+            (i === nodeId ? "text-indigo-400" : (i < nodeId ? "text-zinc-300" : "text-zinc-500"));
+        }
+
+        // Vertical List Cards
+        const listCard = document.getElementById(`node-${i}`);
+        if (listCard) {
+          listCard.className = i === nodeId 
+            ? "glass-active p-5 rounded-2xl cursor-pointer group node-connector relative" 
+            : "glass hover:border-zinc-800/80 p-5 rounded-2xl cursor-pointer group node-connector relative";
+          
+          // Manage connector layout helper logic on cards
+          if (i === 7) listCard.classList.remove('node-connector');
+        }
+      }
+
+      // Render Active Details
+      renderDetails();
+    }
+
+    function renderDetails() {
+      const data = nodeDetails[currentStep];
+      if (!data) return;
+
+      // Update header details
+      document.getElementById('detail-tag').innerText = data.tag;
+      document.getElementById('detail-title').innerText = data.title;
+      document.getElementById('detail-badge').innerText = data.badge;
+      
+      // Update body based on Explainer Mode (Simple vs Technical)
+      const bodyContainer = document.getElementById('detail-body');
+      bodyContainer.style.opacity = 0;
+      
+      setTimeout(() => {
+        bodyContainer.innerHTML = explainerMode === 'simple' ? data.simple : data.technical;
+        bodyContainer.style.opacity = 1;
+      }, 150);
+
+      // Show detail metadata banner
+      document.getElementById('detail-badge-container').classList.remove('hidden');
+
+      // Update Walkthrough Progress Details
+      document.getElementById('walkthrough-progress').innerText = `Step ${currentStep} of 7`;
+
+      // Update bottom buttons states
+      document.getElementById('btn-prev').disabled = currentStep === 1;
+      const nextBtn = document.getElementById('btn-next');
+      if (currentStep === 7) {
+        nextBtn.innerText = "Finish Walkthrough";
+        nextBtn.className = "px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 shadow-md shadow-indigo-600/10 transition-colors";
+      } else {
+        nextBtn.innerText = "Next Step →";
+        nextBtn.className = "px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 shadow-md shadow-indigo-600/10 transition-colors";
+      }
+    }
+
+    function toggleViewMode(mode) {
+      explainerMode = mode;
+      
+      const simpleBtn = document.getElementById('btn-mode-simple');
+      const techBtn = document.getElementById('btn-mode-technical');
+
+      if (mode === 'simple') {
+        simpleBtn.className = "px-4 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white shadow-md shadow-indigo-600/15 focus:outline-none transition-all duration-200";
+        techBtn.className = "px-4 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-zinc-200 focus:outline-none transition-all duration-200";
+      } else {
+        techBtn.className = "px-4 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white shadow-md shadow-indigo-600/15 focus:outline-none transition-all duration-200";
+        simpleBtn.className = "px-4 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-zinc-200 focus:outline-none transition-all duration-200";
+      }
+
+      if (currentStep > 0) {
+        renderDetails();
+      }
+    }
+
+    function nextStep() {
+      if (currentStep < 7) {
+        selectNode(currentStep + 1);
+      } else {
+        // Reset or finish
+        alert("Walkthrough complete! You are ready to explain the pipeline flow.");
+        selectNode(1);
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 1) {
+        selectNode(currentStep - 1);
+      }
+    }
+
+    // Initialize Explainer mode buttons
+    toggleViewMode('simple');
+  </script>
+</body>
+</html>
