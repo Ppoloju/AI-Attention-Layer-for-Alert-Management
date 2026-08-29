@@ -12,7 +12,7 @@ export function loadRootEnv(): string | null {
   for (let i = 0; i < 4; i++) {
     const envPath = path.join(dir, '.env');
     if (fs.existsSync(envPath)) {
-      dotenv.config({ path: envPath });
+      dotenv.config({ path: envPath, override: true });
       return envPath;
     }
     const parent = path.dirname(dir);
