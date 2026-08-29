@@ -1,0 +1,19 @@
+{
+  "name": "signalflow",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "db:up": "docker-compose up -d postgres redis",
+    "db:down": "docker-compose down",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "backend:worker": "cd backend && npm run worker"
+  },
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "dependencies": {
+    "@upstash/redis": "^1.38.3"
+  }
+}
