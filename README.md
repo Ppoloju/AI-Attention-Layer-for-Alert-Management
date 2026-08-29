@@ -23,13 +23,14 @@ SignalFlow is an intelligent, AI-powered attention layer for operational inciden
 ## Tech Stack
 
 ### Frontend
-| Component | Technology | Version |
-|---|---|---|
-| Framework | Next.js | 16.3.3 |
-| UI Library | React | 19.2.8 |
-| Styling | Tailwind CSS | 4.0+ |
-| Language | TypeScript | 5.0+ |
-| Linting | ESLint | 9.0+ |
+| Component | Technology | Version | Description |
+|---|---|---|---|
+| Framework | Next.js | 16.3.3 | App Router full-stack framework |
+| UI Library | React | 19.2.8 | UI component library |
+| Component Primitives | @base-ui/react | 1.7.0 | Accessible interactive components |
+| Styling | Tailwind CSS | 4.0+ | Modern utility CSS framework |
+| Language | TypeScript | 5.0+ | Strict type-safety |
+| Linting | ESLint | 9.0+ | Code quality & formatting |
 
 ### Backend & API
 | Component | Technology | Version |
@@ -165,6 +166,9 @@ SignalFlow is an intelligent, AI-powered attention layer for operational inciden
 ✅ **Intelligent Event Correlation** - Automatically groups related events into signals  
 ✅ **Risk Scoring** - Deterministic scoring based on severity and frequency  
 ✅ **AI-Powered Triage** - Groq API integration for automatic analysis  
+✅ **Single-Page Reactive Dashboard** - Live search bar, status tabs (All/Active/Resolved), and priority chips directly in the dashboard sidebar.  
+✅ **Slide-over Review Sheet** - Collapsible details drawer featuring triage recommendations, evidence logging, next steps, and scrollable raw event timelines.  
+✅ **Automatic Database Offline Fail-safes** - In-memory global state mock fallback dynamically activates on db connection timeout or failure, enabling full interactive reviews offline.  
 ✅ **Real-time Dashboard** - Beautiful React UI with dark mode support  
 ✅ **Flexible Infrastructure** - Works with local Docker or Supabase + Upstash  
 ✅ **Background Worker** - Scalable event processing pipeline  
