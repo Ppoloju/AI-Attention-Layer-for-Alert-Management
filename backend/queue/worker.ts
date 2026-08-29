@@ -1,4 +1,6 @@
-import 'dotenv/config';
+import { loadRootEnv } from '../../shared/lib/load-env';
+
+loadRootEnv();
 import {
   initializeDatabase,
   insertEvent,

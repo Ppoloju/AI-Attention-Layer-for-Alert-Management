@@ -1,358 +1,676 @@
 # SignalFlow — AI Attention Layer for Incident Alert Management
 
-SignalFlow is an AI-powered attention layer for operational incidents. It ingests events from multiple sources (GitHub, Slack, Prometheus, etc.), correlates them, and routes them to the right team with AI-powered triage.
+SignalFlow is an intelligent, AI-powered attention layer for operational incident management. It automatically ingests events from multiple sources, correlates them into actionable signals, scores risk deterministically, and provides AI-powered triage recommendations using Groq AI.
 
-This repository contains the **initial vertical slice**: event ingestion via API → Redis queue → worker → PostgreSQL.
+**Stable Release: v1.0.0**  
+**Status:** Production-ready with Docker and Supabase support
 
-## Getting Started
+---
 
-### Prerequisites
+## 📋 Table of Contents
 
-- Node.js 18+
-- Docker and Docker Compose (Docker Desktop must be running)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Running the Application](#running-the-application)
+- [API Reference](#api-reference)
+- [Development](#development)
 
-### Clone and Run
+---
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd AI-Attention-Layer-for-Alert-Management
-   ```
+## Tech Stack
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-   This installs both `frontend/` and `backend/` via npm workspaces.
+### Frontend
+| Component | Technology | Version |
+|---|---|---|
+| Framework | Next.js | 16.3.3 |
+| UI Library | React | 19.2.8 |
+| Styling | Tailwind CSS | 4.0+ |
+| Language | TypeScript | 5.0+ |
+| Linting | ESLint | 9.0+ |
 
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   ```
-   The default values in `.env.example` work with the Docker setup. Edit `.env` only if your local ports differ.
+### Backend & API
+| Component | Technology | Version |
+|---|---|---|
+| API Server | Next.js App Router | 16.3.3 |
+| Runtime | Node.js | 18+ |
+| Database | PostgreSQL | 14+ |
+| ORM | pg (node-postgres) | 8.23.0 |
+| Validation | Zod | 4.5.2 |
 
-4. **Start Docker services (Redis + PostgreSQL)**
-   ```bash
-   docker-compose up -d
-   ```
-   Verify they're running:
-   ```bash
-   docker-compose ps
-   ```
+### Data & Messaging
+| Component | Technology | Version | Environment |
+|---|---|---|---|
+| Message Queue | Redis | Latest | Local (Docker) or Upstash (Production) |
+| Task Queue | Custom Redis Queue | - | Both |
+| Database | PostgreSQL | 14+ | Local (Docker) or Supabase (Production) |
 
-5. **Initialize the database**
-   ```bash
-   docker exec signalflow-postgres psql -U signalflow -d signalflow -c "CREATE TABLE IF NOT EXISTS events (id SERIAL PRIMARY KEY, source TEXT NOT NULL, event_type TEXT NOT NULL, service TEXT NOT NULL, severity TEXT NOT NULL, timestamp TIMESTAMP WITH TIME ZONE NOT NULL, message TEXT NOT NULL, metadata JSONB, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());"
-   docker exec signalflow-postgres psql -U signalflow -d signalflow -c "CREATE INDEX IF NOT EXISTS idx_events_service ON events(service);"
-   docker exec signalflow-postgres psql -U signalflow -d signalflow -c "CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp DESC);"
-   ```
-   Optionally seed test data:
-   ```bash
-   docker exec signalflow-postgres psql -U signalflow -d signalflow -c "INSERT INTO events (source, event_type, service, severity, timestamp, message, metadata) VALUES ('github', 'pull_request', 'payment-api', 'high', NOW() - INTERVAL '1 hour', 'Payment API deployment health check failed', '{\"repository\": \"demo/repo\", \"action\": \"opened\"}'), ('prometheus', 'alert', 'auth-service', 'critical', NOW() - INTERVAL '30 minutes', 'High error rate detected in authentication service', '{\"error_rate\": \"0.95\", \"endpoint\": \"/login\"}'), ('slack', 'incident', 'user-service', 'medium', NOW() - INTERVAL '15 minutes', 'Users reporting slow response times', '{\"affected_users\": 150, \"region\": \"us-east\"}');"
-   ```
+### AI & ML
+| Component | Technology | Model |
+|---|---|---|
+| AI Triage Engine | Groq API | llama-3.1-8b-instant |
+| Inference | Groq Cloud | REST API |
 
-6. **Start the frontend application (Next.js API)**
-   ```bash
-   npm run frontend:dev
-   ```
-   The API will be available at `http://localhost:3000`
+### Authentication
+| Component | Technology | Status |
+|---|---|---|
+| Auth Provider | Supabase | Ready (optional) |
+| Session Management | Supabase SSR | @supabase/ssr (0.12.5+) |
 
-7. **Start the backend worker (in a separate terminal)**
-   ```bash
-   npm run backend:worker
-   ```
+### Testing & Quality
+| Component | Technology | Version |
+|---|---|---|
+| Unit Testing | Vitest | 4.1.11+ |
+| Test Coverage | Services: correlation, scoring, triage | - |
+| Code Quality | ESLint | 9.0+ |
 
-The application is now running! You can:
-- Send events to `POST http://localhost:3000/api/events`
-- Query events at `GET http://localhost:3000/api/events`
-- Check health at `GET http://localhost:3000/api/health`
+### DevOps & Deployment
+| Component | Technology | Purpose |
+|---|---|---|
+| Containerization | Docker | Local development & deployment |
+| Orchestration | Docker Compose | Multi-container orchestration |
+| Build Tool | npm/workspace | Monorepo management |
+
+---
 
 ## Architecture
 
 ```
-Browser / Event Sources
-        │
-        ▼
-   Next.js API        ← POST /api/events (validate + enqueue)
-        │
-        ▼
-     Redis             ← Queue (events:queue)
-        │
-        ▼
-   Worker              ← Polls Redis, persists to DB
-        │
-        ▼
-   PostgreSQL          ← events table (durable storage)
+┌─────────────────────────────────────────────────────────────────┐
+│                     Event Sources                               │
+│         (GitHub, Prometheus, Slack, Custom HTTP, etc.)          │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+                    POST /api/events
+                     (Validation)
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                    Next.js Frontend API                          │
+│                    (Route Handlers)                              │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ GET  /api/signals       - Fetch ranked signals           │   │
+│  │ GET  /api/signals/[id]  - Get signal with events         │   │
+│  │ POST /api/events        - Enqueue new events             │   │
+│  │ GET  /api/health        - System health check            │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+                    Enqueue (JSON)
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                  Redis Message Queue                             │
+│           (Upstash REST in prod, local Docker)                   │
+│               ↓ Stores pending events ↓                          │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+                  Dequeue (Node.js Worker)
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│             Background Worker (Node.js + tsx)                    │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ 1. Correlation Engine                                    │   │
+│  │    - Groups events by service                            │   │
+│  │    - Detects patterns within time window (5 min)         │   │
+│  │                                                          │   │
+│  │ 2. Scoring Engine                                        │   │
+│  │    - Calculates risk_score (0-100)                       │   │
+│  │    - Determines priority (P0-P3)                         │   │
+│  │    - Based on severity & event frequency                 │   │
+│  │                                                          │   │
+│  │ 3. AI Triage (Optional - Groq API)                       │   │
+│  │    - Hypothesis generation                              │   │
+│  │    - Evidence extraction                                │   │
+│  │    - Next steps recommendation                           │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+            INSERT/UPDATE Signals + Events
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│          PostgreSQL Database (Supabase or Docker)                │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Tables:                                                  │   │
+│  │ • events - Raw events (source, severity, message, etc)   │   │
+│  │ • signals - Correlated signals (priority, risk_score)    │   │
+│  │ • signal_events - Junction table (N-to-M relationship)   │   │
+│  │                                                          │   │
+│  │ Indexes: service, severity, created_at, risk_score      │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+                 GET /api/signals (List)
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│              React Dashboard (Next.js Frontend)                  │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ • Signals list (ranked by risk_score)                    │   │
+│  │ • Real-time stats (P0/P1 count, queue pending)           │   │
+│  │ • Signal detail view with AI triage recommendations      │   │
+│  │ • Event timeline visualization                           │   │
+│  │ • System health indicator                                │   │
+│  │ • Dark mode support                                      │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
 ```
+
+## Features
+
+✅ **Intelligent Event Correlation** - Automatically groups related events into signals  
+✅ **Risk Scoring** - Deterministic scoring based on severity and frequency  
+✅ **AI-Powered Triage** - Groq API integration for automatic analysis  
+✅ **Real-time Dashboard** - Beautiful React UI with dark mode support  
+✅ **Flexible Infrastructure** - Works with local Docker or Supabase + Upstash  
+✅ **Background Worker** - Scalable event processing pipeline  
+✅ **RESTful API** - Easy integration with existing tools  
+✅ **Comprehensive Testing** - Unit tests for all service logic  
+✅ **Health Monitoring** - System status endpoint with provider info  
+
+## Quick Start
+
+### Prerequisites
+
+- **Node.js** 18+ (get from [nodejs.org](https://nodejs.org))
+- **.env file** at the project root (copy from `.env.example`)
+- **Docker & Docker Compose** (optional, for local database/Redis) OR  
+- **Supabase account** + **Upstash Redis** account (for production)
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Fill in your credentials:
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Supabase PostgreSQL connection string |
+| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST endpoint |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis token |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon/publishable key |
+| `GROQ_API_KEY` | Groq API key for AI triage (optional) |
+
+For **local development** without cloud services, leave `DATABASE_URL` and Upstash vars empty and use Docker:
+
+```bash
+npm run db:up
+```
+
+### 3. Run the application
+
+```bash
+npm run dev
+```
+
+This starts both the Next.js frontend (port 3000) and the background worker.
+
+Or run them separately:
+
+```bash
+npm run frontend:dev    # Terminal 1
+npm run backend:worker  # Terminal 2
+```
+
+Open **http://localhost:3000** for the dashboard.
+
+### 4. Send test events
+
+```bash
+curl -X POST http://localhost:3000/api/events \
+  -H "Content-Type: application/json" \
+  -d '{"source":"prometheus","event_type":"alert","service":"payment-api","severity":"high","timestamp":"2026-08-29T10:00:00Z","message":"Error rate spike"}'
+
+curl -X POST http://localhost:3000/api/events \
+  -H "Content-Type: application/json" \
+  -d '{"source":"github","event_type":"deploy","service":"payment-api","severity":"critical","timestamp":"2026-08-29T10:01:00Z","message":"Deploy rollback triggered"}'
+```
+
+Two events for the same service within 5 minutes create a correlated **signal** visible on the dashboard.
+
+## API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/events` | Validate and enqueue an event (202 Accepted) |
+| `GET` | `/api/events` | List persisted events |
+| `GET` | `/api/signals` | List correlated signals (ranked by risk) |
+| `GET` | `/api/signals/[id]` | Get signal details with correlated events |
+| `GET` | `/api/health` | System health check with provider status |
+
+## Configuration
+
+### Environment Variables - Complete Reference
+
+```bash
+# ════ DATABASE ════════════════════════════════════════════════
+# Option 1: Supabase URL (recommended for production)
+DATABASE_URL=postgresql://postgres:PASSWORD@db.REGION.supabase.co:5432/postgres
+
+# Option 2: Local Docker PostgreSQL
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=signalflow
+DB_USER=signalflow
+DB_PASSWORD=signalflow_password
+
+# ════ REDIS QUEUE ═════════════════════════════════════════════
+# Option 1: Upstash Redis (recommended for production)
+UPSTASH_REDIS_REST_URL=https://YOUR-ENDPOINT.upstash.io
+UPSTASH_REDIS_REST_TOKEN=YOUR_TOKEN
+
+# Option 2: Local Docker Redis
+REDIS_URL=redis://localhost:6379
+
+# ════ SUPABASE AUTH (OPTIONAL) ════════════════════════════════
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=eyJhbGc...
+
+# ════ GROQ AI (OPTIONAL) ══════════════════════════════════════
+# Triage is skipped when not configured
+GROQ_API_KEY=gsk_YOUR_KEY_HERE
+GROQ_MODEL=llama-3.1-8b-instant
+```
+
+### Connection Modes
+
+#### Local Development (Docker)
+```bash
+# Start PostgreSQL and Redis
+npm run db:up
+
+# Worker will use: localhost:5432 (PostgreSQL), localhost:6379 (Redis)
+```
+
+#### Production (Supabase + Upstash)
+```bash
+# Fill in DATABASE_URL (Supabase)
+# Fill in UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
+# 
+# No Docker needed - cloud-hosted managed services
+```
+
+## Running the Application
+
+### Development Mode
+
+**Start everything:**
+```bash
+npm run dev
+```
+- Frontend: http://localhost:3000
+- Backend Worker: Processing events in background
+
+**Individual processes:**
+```bash
+npm run frontend:dev      # Terminal 1 - Next.js dev server
+npm run backend:worker    # Terminal 2 - Event processing worker
+```
+
+### Production Build
+
+```bash
+npm run frontend:build    # Build Next.js
+npm start                 # Run production server
+```
+
+### Database & Queue Management
+
+```bash
+npm run db:up            # Start Docker containers (Postgres + Redis)
+npm run db:down          # Stop containers
+```
+
+## API Reference
+
+### Events API
+
+#### POST /api/events
+**Enqueue a new event** (accepted to Redis, processed asynchronously)
+
+Request body (JSON):
+```json
+{
+  "source": "prometheus",          // Event source (e.g., prometheus, github, slack)
+  "event_type": "alert",           // Type of event
+  "service": "payment-api",        // Service affected
+  "severity": "high",              // critical | high | medium | low
+  "message": "Error rate exceeded threshold",
+  "metadata": {                    // Optional context
+    "error_rate": "15.5%",
+    "duration_seconds": 300
+  },
+  "timestamp": "2026-08-29T10:00:00Z"
+}
+```
+
+Response (202 Accepted):
+```json
+{
+  "message": "Event accepted",
+  "event": { /* echo of accepted event */ }
+}
+```
+
+#### GET /api/events
+**List recent events**
+
+Query params:
+- `limit` (1-1000, default 50)
+
+Response:
+```json
+{
+  "events": [
+    {
+      "id": 1,
+      "source": "prometheus",
+      "event_type": "alert",
+      "service": "payment-api",
+      "severity": "high",
+      "message": "Error rate spike",
+      "metadata": { "error_rate": "15.5%" },
+      "timestamp": "2026-08-29T10:00:00Z",
+      "created_at": "2026-08-29T10:00:01Z"
+    }
+  ]
+}
+```
+
+### Signals API
+
+#### GET /api/signals
+**List correlated signals** (ranked by risk_score DESC)
+
+Query params:
+- `limit` (1-1000, default 50)
+
+Response:
+```json
+{
+  "signals": [
+    {
+      "id": "signal_payment-api_20260829_1000",
+      "service": "payment-api",
+      "title": "Payment API Errors",
+      "max_severity": "critical",
+      "risk_score": 92,
+      "priority": "P0",
+      "representative_message": "Multiple error events detected",
+      "event_count": 5,
+      "start_time": "2026-08-29T10:00:00Z",
+      "end_time": "2026-08-29T10:05:00Z",
+      "created_at": "2026-08-29T10:01:00Z"
+    }
+  ]
+}
+```
+
+#### GET /api/signals/[id]
+**Get signal details with correlated events**
+
+Response:
+```json
+{
+  "signal": {
+    "id": "signal_payment-api_20260829_1000",
+    "service": "payment-api",
+    "title": "Payment API Errors",
+    "max_severity": "critical",
+    "risk_score": 92,
+    "priority": "P0",
+    "event_count": 5,
+    "ai_hypothesis": "Database connection pool exhaustion causing cascading failures",
+    "ai_confidence": "high",
+    "ai_evidence": [
+      "Connection pool at capacity",
+      "Increasing error rates correlate with connection timeout"
+    ],
+    "ai_next_steps": [
+      "Scale database read replicas",
+      "Increase connection pool size"
+    ],
+    "events": [
+      {
+        "id": 1,
+        "source": "prometheus",
+        "event_type": "alert",
+        "service": "payment-api",
+        "severity": "critical",
+        "message": "Connection pool exhausted",
+        "metadata": { "pool_size": 100, "active": 100 },
+        "timestamp": "2026-08-29T10:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+#### GET /api/health
+**System health check**
+
+Response:
+```json
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "providers": {
+    "database": "supabase",
+    "redis": "upstash",
+    "groq": "configured",
+    "supabase": "configured"
+  },
+  "services": {
+    "redis": "healthy",
+    "database": "healthy",
+    "supabase": "healthy"
+  },
+  "queue": {
+    "pending": 0
+  },
+  "timestamp": "2026-08-29T10:00:00Z"
+}
+```
+
+## Development
+
+### Project Structure
+
+```
+AI-Attention-Layer-for-Alert-Management/
+├── frontend/                    # Next.js React UI
+│   ├── app/
+│   │   ├── page.tsx            # Dashboard (signals list)
+│   │   ├── signals/[id]/page.tsx # Signal detail view
+│   │   └── api/                # Route handlers
+│   │       ├── events/route.ts # Event enqueue endpoint
+│   │       ├── signals/route.ts
+│   │       └── health/route.ts
+│   └── lib/queue.ts            # Redis queue client
+│
+├── backend/                     # Node.js worker
+│   ├── lib/
+│   │   ├── ai.ts              # Groq AI integration
+│   │   └── redis.ts           # Redis client
+│   ├── queue/
+│   │   └── worker.ts          # Event processing loop
+│   ├── services/              # Business logic
+│   │   ├── correlation.ts     # Signal correlation
+│   │   ├── scoring.ts         # Risk scoring
+│   │   └── triage.ts          # AI triage
+│   └── __tests__/             # Unit tests (Vitest)
+│
+├── shared/                      # Monorepo shared code
+│   ├── lib/
+│   │   ├── db.ts              # PostgreSQL queries
+│   │   ├── load-env.ts        # Env var loader
+│   │   └── providers.ts       # Provider detection
+│   └── schemas/
+│       └── event.ts           # Zod event validation
+│
+├── database/
+│   ├── migrations/            # SQL schema versions
+│   └── seed.sql              # Sample data
+│
+├── docker-compose.yml         # Local dev containers
+├── .env.example               # Environment template
+└── README.md                  # This file
+```
+
+### Running Tests
+
+```bash
+npm test                # Run all backend tests (correlation, scoring, triage)
+npm run test:watch    # Watch mode for TDD
+```
+
+### Adding Custom Event Sources
+
+Events must conform to the [Zod EventSchema](/shared/schemas/event.ts):
+
+```typescript
+{
+  source: string;        // "prometheus", "github", "slack", etc.
+  event_type: string;    // "alert", "deploy", "error", etc.
+  service: string;       // Service name (used for correlation)
+  severity: string;      // "critical" | "high" | "medium" | "low"
+  message: string;       // Human-readable description
+  metadata?: Record;     // Optional structured data
+  timestamp: string;     // ISO 8601 timestamp
+}
+```
+
+Any event matching this schema will be automatically:
+1. Enqueued to Redis
+2. Correlated with recent events from same service
+3. Scored based on severity and frequency
+4. Persisted to database
+5. Analyzed by AI triage (if configured)
+
+## Deployment Guide
+
+### Docker Deployment
+
+```bash
+# Build & run locally with Compose
+docker-compose up
+
+# Or build production image
+docker build -t signalflow:latest .
+docker run -p 3000:3000 --env-file .env signalflow:latest
+```
+
+### Kubernetes Deployment
+
+1. Deploy PostgreSQL via StatefulSet (or use Supabase)
+2. Deploy Redis via Helm (or use Upstash)
+3. Deploy Next.js app via Deployment
+4. Deploy background worker as separate Deployment
+5. Create Service for frontend (port 3000)
+
+### Monitoring & Logs
+
+```bash
+# Check health endpoint
+curl http://localhost:3000/api/health
+
+# View worker logs
+docker-compose logs -f backend
+
+# Database logs
+docker-compose logs -f postgres
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -am 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## Troubleshooting
+
+### Database Connection Error
+- Ensure `.env` has correct credentials
+- Run `npm run db:up` if using local Docker
+- Check Supabase project is active
+
+### Redis Connection Error
+- Verify local Redis running: `redis-cli ping`
+- Check Upstash credentials if using cloud
+
+### AI Triage Not Working
+- `GROQ_API_KEY` must be set in `.env`
+- Check Groq API quota and rate limits
+- Triage is optional - app works without it
+
+## License
+
+MIT
+| `GET` | `/api/signals/:id` | Signal detail with events and AI triage |
+| `GET` | `/api/health` | Health check (DB, Redis, Supabase, queue size) |
 
 ## Folder Structure
 
 ```
-├── frontend/              # Next.js app + API routes
-│   ├── app/
-│   │   ├── api/
-│   │   │   ├── events/    # POST (enqueue) + GET (query persisted)
-│   │   │   └── health/    # GET (Redis + PostgreSQL check)
-│   │   ├── layout.tsx
-│   │   ├── page.tsx
-│   │   └── globals.css
-│   ├── lib/
-│   │   └── queue.ts       # Redis queue client
-│   ├── package.json
-│   └── tsconfig.json
-│
-├── backend/               # Core processing
-│   ├── lib/
-│   │   ├── db.ts          # PostgreSQL pool + queries
-│   │   └── redis.ts       # Redis queue (enqueue/dequeue)
-│   ├── queue/
-│   │   └── worker.ts      # Polls Redis, validates, inserts to DB
-│   └── package.json
-│
-├── database/
-│   ├── migrations/
-│   │   └── 001_initial_schema.sql
-│   └── seed.sql
-│
-├── shared/
-│   └── schemas/
-│       └── event.ts       # Zod schema (shared by API + worker)
-│
-├── docker-compose.yml     # Redis + PostgreSQL
-├── .env.example
-├── .gitignore
-├── package.json           # Workspace root
-└── README.md
+├── frontend/           Next.js app + API routes + dashboard UI
+├── backend/            Worker, correlation, scoring, AI triage
+├── shared/             Shared DB layer, Zod schemas, env loader
+├── database/           SQL migrations and seed data
+├── docker-compose.yml  Local Redis + PostgreSQL
+├── .env.example        Environment template
+└── package.json        Monorepo workspace root
 ```
 
-## Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `DB_HOST` | `localhost` | PostgreSQL host |
-| `DB_PORT` | `5432` | PostgreSQL port |
-| `DB_NAME` | `signalflow` | PostgreSQL database |
-| `DB_USER` | `signalflow` | PostgreSQL user |
-| `DB_PASSWORD` | `signalflow_password` | PostgreSQL password |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
-
-## API Endpoints
-
-### POST /api/events
-
-Accept and validate an event, enqueue it for processing.
-
-```bash
-curl -X POST http://localhost:3000/api/events \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "github",
-    "event_type": "pull_request",
-    "service": "payment-api",
-    "severity": "high",
-    "timestamp": "2026-08-29T10:20:00Z",
-    "message": "Payment API deployment health check failed",
-    "metadata": {"repository": "demo/repo", "action": "opened"}
-  }'
-```
-
-Returns `202 Accepted` with the event.
-
-### GET /api/events
-
-Query persisted events from PostgreSQL.
-
-```bash
-curl http://localhost:3000/api/events?limit=10
-```
-
-### GET /api/health
-
-Check Redis and PostgreSQL connectivity.
-
-```bash
-curl http://localhost:3000/api/health
-```
-
-Returns `status: "ok"` when both are healthy.
-
-## Event Schema
-
-Events must conform to:
-
-```typescript
-{
-  source: "github" | "slack" | "jira" | "prometheus" | "custom"
-  event_type: string
-  service: string
-  severity: "low" | "medium" | "high" | "critical"
-  timestamp: string  // ISO 8601
-  message: string
-  metadata?: Record<string, any>
-}
-```
-
-Invalid events are rejected with `400 Bad Request`.
-
-## Worker Behavior
-
-The worker (`npm run backend:worker`) runs in an infinite loop:
-
-1. Polls Redis every 1 second
-2. Dequeues one event at a time
-3. Validates against the Zod schema
-4. Inserts into PostgreSQL `events` table
-5. Logs the result
-
-If the worker is down, events accumulate in Redis and are processed when it restarts.
-
-## Implementation Status
+## Implementation Status (v1.0.0)
 
 ### Completed
 
-- Event ingestion API (POST /api/events)
-- Zod schema validation (shared between API and worker)
-- Redis queue (enqueue/dequeue)
-- Background worker (poll + persist)
-- PostgreSQL storage with indexes
-- Health endpoint (Redis + PostgreSQL)
-- Docker Compose (Redis + PostgreSQL)
-- Event querying (GET /api/events)
+- Event ingestion API with Zod validation
+- Redis queue (Upstash + local Docker)
+- Background worker with correlation engine
+- Deterministic risk scoring (P0–P3 priorities)
+- Groq AI triage (hypothesis, evidence, next steps)
+- Supabase PostgreSQL storage with auto-migration
+- Dashboard UI with live health status
+- Signal detail page with AI triage panel
+- Health endpoint with provider detection
+- 43 unit tests passing
 
-### Not Implemented
+### Planned
 
-- Correlation engine
-- Risk scoring
-- AI/Grok integration
-- Dashboard UI
-- Event routing
-- External integrations (GitHub, Slack, Jira, Prometheus)
-- Authentication
-- Feedback loop
+- External webhook integrations (GitHub, Slack, Jira, Prometheus)
+- Authentication and RBAC via Supabase Auth
+- Real-time signal updates (Supabase Realtime)
+- Feedback loop for operator resolution
+- Alert routing to on-call teams
 
-## Future Scope
+## Scripts
 
-1. **Correlation Engine** — Group related events into incidents by service, time window, and keywords
-2. **Risk Scoring** — Deterministic scoring based on severity, frequency, and service criticality
-3. **AI Triage** — Use AI to generate summaries, hypotheses, and suggested next steps
-4. **Dashboard** — Real-time UI for viewing signals, incidents, and event flow
-5. **Routing** — Direct events to the responsible team based on rules and AI classification
-6. **Integrations** — GitHub webhooks, Slack notifications, Jira ticket creation, Prometheus alerts
-7. **Authentication** — User auth and role-based access control
-8. **Feedback Loop** — Allow operators to mark events as resolved, improving AI over time
+| Command | Description |
+|---|---|
+| `npm run dev` | Start frontend + worker together |
+| `npm run frontend:dev` | Next.js dev server only |
+| `npm run backend:worker` | Background worker only |
+| `npm run frontend:build` | Production build |
+| `npm run test` | Run backend unit tests |
+| `npm run db:up` | Start local Docker services |
+| `npm run db:down` | Stop local Docker services |
 
-## Environment Variables
+## License
 
-| Variable | Default | Description |
-|---|---|---|
-| `DB_HOST` | `localhost` | PostgreSQL host |
-| `DB_PORT` | `5432` | PostgreSQL port |
-| `DB_NAME` | `signalflow` | PostgreSQL database |
-| `DB_USER` | `signalflow` | PostgreSQL user |
-| `DB_PASSWORD` | `signalflow_password` | PostgreSQL password |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
-
-## API Endpoints
-
-### POST /api/events
-
-Accept and validate an event, enqueue it for processing.
-
-```bash
-curl -X POST http://localhost:3000/api/events \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "github",
-    "event_type": "pull_request",
-    "service": "payment-api",
-    "severity": "high",
-    "timestamp": "2026-08-29T10:20:00Z",
-    "message": "Payment API deployment health check failed",
-    "metadata": {"repository": "demo/repo", "action": "opened"}
-  }'
-```
-
-Returns `202 Accepted` with the event.
-
-### GET /api/events
-
-Query persisted events from PostgreSQL.
-
-```bash
-curl http://localhost:3000/api/events?limit=10
-```
-
-### GET /api/health
-
-Check Redis and PostgreSQL connectivity.
-
-```bash
-curl http://localhost:3000/api/health
-```
-
-Returns `status: "ok"` when both are healthy.
-
-## Event Schema
-
-Events must conform to:
-
-```typescript
-{
-  source: "github" | "slack" | "jira" | "prometheus" | "custom"
-  event_type: string
-  service: string
-  severity: "low" | "medium" | "high" | "critical"
-  timestamp: string  // ISO 8601
-  message: string
-  metadata?: Record<string, any>
-}
-```
-
-Invalid events are rejected with `400 Bad Request`.
-
-## Worker Behavior
-
-The worker (`npm run backend:worker`) runs in an infinite loop:
-
-1. Polls Redis every 1 second
-2. Dequeues one event at a time
-3. Validates against the Zod schema
-4. Inserts into PostgreSQL `events` table
-5. Logs the result
-
-If the worker is down, events accumulate in Redis and are processed when it restarts.
-
-## Implementation Status
-
-### Completed
-
-- Event ingestion API (POST /api/events)
-- Zod schema validation (shared between API and worker)
-- Redis queue (enqueue/dequeue)
-- Background worker (poll + persist)
-- PostgreSQL storage with indexes
-- Health endpoint (Redis + PostgreSQL)
-- Docker Compose (Redis + PostgreSQL)
-- Event querying (GET /api/events)
-
-### Not Implemented
-
-- Correlation engine
-- Risk scoring
-- AI/Grok integration
-- Dashboard UI
-- Event routing
-- External integrations (GitHub, Slack, Jira, Prometheus)
-- Authentication
-- Feedback loop
-
-## Future Scope
-
-1. **Correlation Engine** — Group related events into incidents by service, time window, and keywords
-2. **Risk Scoring** — Deterministic scoring based on severity, frequency, and service criticality
-3. **AI Triage** — Use AI to generate summaries, hypotheses, and suggested next steps
-4. **Dashboard** — Real-time UI for viewing signals, incidents, and event flow
-5. **Routing** — Direct events to the responsible team based on rules and AI classification
-6. **Integrations** — GitHub webhooks, Slack notifications, Jira ticket creation, Prometheus alerts
-7. **Authentication** — User auth and role-based access control
-8. **Feedback Loop** — Allow operators to mark events as resolved, improving AI over time
+Private — SignalLabs AI HackDay project.

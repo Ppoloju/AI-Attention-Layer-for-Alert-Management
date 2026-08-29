@@ -1,13 +1,15 @@
 {
   "name": "signalflow",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "db:up": "docker-compose up -d postgres redis",
     "db:down": "docker-compose down",
+    "dev": "concurrently \"npm run frontend:dev\" \"npm run backend:worker\"",
     "frontend:dev": "cd frontend && npm run dev",
     "frontend:build": "cd frontend && npm run build",
-    "backend:worker": "cd backend && npm run worker"
+    "backend:worker": "cd backend && npm run worker",
+    "test": "cd backend && npm test"
   },
   "workspaces": [
     "frontend",
@@ -17,5 +19,8 @@
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
     "@upstash/redis": "^1.38.3"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

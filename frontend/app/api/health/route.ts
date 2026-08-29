@@ -1,23 +1,52 @@
 import { NextResponse } from 'next/server';
 import EventQueue from '../../../lib/queue';
 import { healthCheck } from '../../../../shared/lib/db';
+import {
+  getDatabaseProvider,
+  getRedisProvider,
+  isGroqConfigured,
+  isSupabaseConfigured,
+} from '../../../../shared/lib/providers';
+import { checkSupabaseHealth } from '../../../utils/supabase/middleware';
 
 export async function GET() {
   const queue = new EventQueue();
 
   try {
-    const [redisHealthy, dbHealthy] = await Promise.all([
+    const [redisHealthy, dbHealthy, supabaseHealthy, queueSize] = await Promise.all([
       queue.healthCheck(),
       healthCheck(),
+      isSupabaseConfigured() ? checkSupabaseHealth() : Promise.resolve(null),
+      queue.size().catch(() => null),
     ]);
 
-    const status = redisHealthy && dbHealthy ? 'ok' : 'degraded';
+    const services = {
+      redis: redisHealthy ? 'healthy' : 'unhealthy',
+      database: dbHealthy ? 'healthy' : 'unhealthy',
+      supabase: isSupabaseConfigured()
+        ? supabaseHealthy
+          ? 'healthy'
+          : 'unhealthy'
+        : 'not_configured',
+    };
+
+    const allHealthy =
+      redisHealthy &&
+      dbHealthy &&
+      (!isSupabaseConfigured() || supabaseHealthy === true);
 
     return NextResponse.json({
-      status,
-      services: {
-        redis: redisHealthy ? 'healthy' : 'unhealthy',
-        database: dbHealthy ? 'healthy' : 'unhealthy',
+      status: allHealthy ? 'ok' : 'degraded',
+      version: '1.0.0',
+      providers: {
+        database: getDatabaseProvider(),
+        redis: getRedisProvider(),
+        groq: isGroqConfigured() ? 'configured' : 'not_configured',
+        supabase: isSupabaseConfigured() ? 'configured' : 'not_configured',
+      },
+      services,
+      queue: {
+        pending: queueSize,
       },
       timestamp: new Date().toISOString(),
     });

@@ -1,4 +1,7 @@
 import { Pool } from 'pg';
+import { loadRootEnv } from './load-env';
+
+loadRootEnv();
 
 // ─── Connection config ───────────────────────────────────────────────────────
 //
@@ -8,8 +11,24 @@ import { Pool } from 'pg';
 //
 // DATABASE_URL takes precedence when set.
 
+function getDatabaseUrl(): string | undefined {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+
+  const host = process.env.SUPABASE_DB_HOST;
+  const user = process.env.SUPABASE_DB_USER;
+  const password = process.env.SUPABASE_DB_PASSWORD;
+  const db = process.env.SUPABASE_DB_NAME || 'postgres';
+  const port = process.env.SUPABASE_DB_PORT || '5432';
+
+  if (host && user && password) {
+    return `postgresql://${user}:${encodeURIComponent(password)}@${host}:${port}/${db}`;
+  }
+
+  return undefined;
+}
+
 function createPool() {
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = getDatabaseUrl();
 
   if (databaseUrl) {
     // Parse URL to decide on SSL
@@ -33,12 +52,19 @@ function createPool() {
   });
 }
 
-const pool = createPool();
+let pool: Pool | null = null;
+
+function getPool(): Pool {
+  if (!pool) {
+    pool = createPool();
+  }
+  return pool;
+}
 
 // ─── Initialization ──────────────────────────────────────────────────────────
 
 export async function initializeDatabase() {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     // Events table
     await client.query(`
@@ -130,7 +156,7 @@ export async function initializeDatabase() {
 // ─── Events ──────────────────────────────────────────────────────────────────
 
 export async function insertEvent(event: any) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO events (source, event_type, service, severity, message, metadata, timestamp)
@@ -154,7 +180,7 @@ export async function insertEvent(event: any) {
 
 export async function getEvents(limit = 50) {
   const validatedLimit = Math.min(Math.max(1, limit), 1000);
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT * FROM events ORDER BY timestamp DESC LIMIT $1`,
@@ -174,7 +200,7 @@ export async function getRecentEventsForService(
   service: string,
   windowMinutes: number
 ) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT * FROM events
@@ -203,7 +229,7 @@ export async function insertSignal(signal: {
   startTime: string;
   endTime: string;
 }) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO signals (id, service, title, max_severity, risk_score, priority, representative_message, event_count, start_time, end_time)
@@ -233,7 +259,7 @@ export async function linkSignalEvents(
   signalId: string,
   eventIds: number[]
 ) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     for (const eventId of eventIds) {
       await client.query(
@@ -257,7 +283,7 @@ export async function updateSignalTriage(
     nextSteps: string[];
   }
 ) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query(
       `UPDATE signals
@@ -284,7 +310,7 @@ export async function updateSignalTriage(
  */
 export async function getSignals(limit = 50) {
   const validatedLimit = Math.min(Math.max(1, limit), 1000);
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT * FROM signals ORDER BY risk_score DESC, created_at DESC LIMIT $1`,
@@ -300,7 +326,7 @@ export async function getSignals(limit = 50) {
  * Get a single signal by ID, including its correlated events.
  */
 export async function getSignalById(signalId: string) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const signalResult = await client.query(
       `SELECT * FROM signals WHERE id = $1`,
@@ -330,7 +356,7 @@ export async function getSignalById(signalId: string) {
 
 export async function healthCheck() {
   try {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
       await client.query('SELECT 1');
       return true;
@@ -343,4 +369,4 @@ export async function healthCheck() {
   }
 }
 
-export default pool;
+export default getPool;
