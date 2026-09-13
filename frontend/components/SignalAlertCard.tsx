@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, Shield, Clock, ArrowUpRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Shield, Clock, ArrowUpRight, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface SignalAlertCardProps {
   title?: string;

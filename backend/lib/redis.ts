@@ -1,5 +1,6 @@
 import { Redis as UpstashRedis } from '@upstash/redis';
 import Redis from 'ioredis';
+import type { Event as SignalEvent } from '../../shared/schemas/event';
 
 const QUEUE_NAME = 'events:queue';
 
@@ -15,10 +16,15 @@ const QUEUE_NAME = 'events:queue';
 
 type RedisClient = {
   rpush(key: string, ...args: string[]): Promise<number>;
-  lpop(key: string): Promise<string | null>;
+  /**
+   * Raw reply. `ioredis` always returns the stored string, while
+   * `@upstash/redis` auto-deserializes JSON and returns an object, so callers
+   * must handle both shapes.
+   */
+  lpop(key: string): Promise<unknown>;
   llen(key: string): Promise<number>;
   ping(): Promise<string>;
-  quit(): Promise<any>;
+  quit(): Promise<unknown>;
 };
 
 function createRedisClient(): RedisClient {
@@ -39,8 +45,8 @@ function createRedisClient(): RedisClient {
         return client.rpush(key, ...args);
       },
       async lpop(key: string) {
-        const result = await client.lpop(key);
-        return typeof result === 'string' ? result : null;
+        // May already be a deserialized object — do not coerce to string here.
+        return client.lpop(key);
       },
       async llen(key: string) {
         return client.llen(key);
@@ -68,19 +74,30 @@ class EventQueue {
     this.client = createRedisClient();
   }
 
-  async enqueue(event: any): Promise<void> {
+  async enqueue(event: SignalEvent): Promise<void> {
     await this.client.rpush(QUEUE_NAME, JSON.stringify(event));
   }
 
-  async dequeue(): Promise<any | null> {
+  async dequeue(): Promise<SignalEvent | null> {
     const result = await this.client.lpop(QUEUE_NAME);
-    if (!result) return null;
-    try {
-      return JSON.parse(result);
-    } catch (error) {
-      console.error('Failed to parse event from queue:', error);
-      return null;
+    if (result === null || result === undefined) return null;
+
+    if (typeof result === 'string') {
+      try {
+        return JSON.parse(result) as SignalEvent;
+      } catch (error) {
+        console.error('Failed to parse event from queue:', error);
+        return null;
+      }
     }
+
+    if (typeof result === 'object') {
+      // Upstash already deserialized the JSON payload for us.
+      return result as SignalEvent;
+    }
+
+    console.error('Unexpected queue payload type:', typeof result);
+    return null;
   }
 
   async size(): Promise<number> {

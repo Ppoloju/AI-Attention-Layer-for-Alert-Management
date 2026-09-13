@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { 
-  Bell, ShieldAlert, CheckCircle2, AlertOctagon, HelpCircle, 
-  Search, X, ExternalLink, Clock, Play, RefreshCw, Filter, Shield
+import {
+  Bell, ShieldAlert, CheckCircle2, AlertOctagon, HelpCircle,
+  Search, X, RefreshCw, Filter, Shield
 } from 'lucide-react';
 import SignalAlertCard from '../components/SignalAlertCard';
 
@@ -48,6 +48,14 @@ interface Stats {
   noiseReduction: number;
 }
 
+// Rendered from a timestamp captured when data was fetched, so no impure
+// time reads happen during render.
+function formatTimeAgo(now: number | null, iso: string): string {
+  if (now === null) return '—';
+  const elapsedMinutes = Math.max(1, Math.round((now - new Date(iso).getTime()) / 60000));
+  return `${elapsedMinutes}m ago`;
+}
+
 export default function Dashboard() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [stats, setStats] = useState<Stats>({
@@ -59,6 +67,7 @@ export default function Dashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
 
   // ─── Filtering State ────────────────────────────────────────────────────────
 
@@ -90,29 +99,38 @@ export default function Dashboard() {
 
       setSignals(signalsData.signals || []);
       setStats(statsData);
+      setFetchedAt(Date.now());
       setError(null);
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setError(err.message || 'An error occurred while loading data.');
+      setError(err instanceof Error ? err.message : 'An error occurred while loading data.');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchData();
+    const poll = async () => {
+      await fetchData();
+    };
+
+    void poll();
     // Poll every 10 seconds for real-time dashboard updates
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(poll, 10000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
   // ─── Fetch Drawer Signal ─────────────────────────────────────────────────────
 
+  const closeDrawer = useCallback(() => {
+    setSelectedSignalId(null);
+    setDrawerSignal(null);
+  }, []);
+
   useEffect(() => {
-    if (!selectedSignalId) {
-      setDrawerSignal(null);
-      return;
-    }
+    if (!selectedSignalId) return;
+
+    let cancelled = false;
 
     const fetchDrawerData = async () => {
       setDrawerLoading(true);
@@ -120,16 +138,20 @@ export default function Dashboard() {
         const res = await fetch(`/api/signals/${selectedSignalId}`);
         if (res.ok) {
           const data = await res.json();
-          setDrawerSignal(data.signal);
+          if (!cancelled) setDrawerSignal(data.signal);
         }
       } catch (err) {
         console.error('Error fetching signal details:', err);
       } finally {
-        setDrawerLoading(false);
+        if (!cancelled) setDrawerLoading(false);
       }
     };
 
-    fetchDrawerData();
+    void fetchDrawerData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedSignalId]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -148,10 +170,10 @@ export default function Dashboard() {
       if (!res.ok) throw new Error('Failed to update status');
 
       // Optimistic state update in signals list
-      setSignals(prev => prev.map(s => s.id === id ? { ...s, status: nextStatus as any } : s));
-      
+      setSignals(prev => prev.map(s => s.id === id ? { ...s, status: nextStatus } : s));
+
       // Update drawer signal if currently selected
-      setDrawerSignal(prev => prev && prev.id === id ? { ...prev, status: nextStatus as any } : prev);
+      setDrawerSignal(prev => prev && prev.id === id ? { ...prev, status: nextStatus } : prev);
       
       setStats(prev => {
         const isResolvedNow = nextStatus === 'resolved';
@@ -402,7 +424,7 @@ export default function Dashboard() {
                       priority={signal.priority}
                       maxSeverity={signal.max_severity}
                       eventCount={signal.event_count}
-                      timeAgo={`${Math.max(1, Math.round((Date.now() - new Date(signal.start_time).getTime()) / 60000))}m ago`}
+                      timeAgo={formatTimeAgo(fetchedAt, signal.start_time)}
                       aiSummary={signal.ai_hypothesis || "No AI summary generated for this correlation yet."}
                       status={signal.status}
                       onResolve={() => handleResolveSignal(signal.id, signal.status)}
@@ -453,7 +475,7 @@ export default function Dashboard() {
       {selectedSignalId && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity duration-300 cursor-pointer"
-          onClick={() => setSelectedSignalId(null)}
+          onClick={closeDrawer}
         />
       )}
 
@@ -471,7 +493,7 @@ export default function Dashboard() {
             </h2>
           </div>
           <button 
-            onClick={() => setSelectedSignalId(null)}
+            onClick={closeDrawer}
             className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
           >
             <X className="h-4.5 w-4.5" />
