@@ -7,7 +7,9 @@ services:
       POSTGRES_USER: signalflow
       POSTGRES_PASSWORD: signalflow_password
     ports:
-      - "5432:5432"
+      # Host port is overridable so this stack can coexist with other
+      # projects already publishing 5432 (set POSTGRES_PORT in .env).
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

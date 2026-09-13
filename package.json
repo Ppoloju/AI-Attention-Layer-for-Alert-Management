@@ -7,10 +7,13 @@
     "db:down": "docker-compose down",
     "dev": "concurrently \"npm run frontend:dev\" \"npm run backend:worker\"",
     "dev:full": "npm run dev",
+    "start": "cd frontend && npm run start",
     "frontend:dev": "cd frontend && npm run dev",
     "frontend:build": "cd frontend && npm run build",
     "backend:worker": "cd backend && npm run worker",
-    "test": "cd backend && npm test"
+    "lint": "cd frontend && npm run lint",
+    "test": "cd backend && npm test",
+    "test:watch": "cd backend && npm run test:watch"
   },
   "workspaces": [
     "frontend",

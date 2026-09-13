@@ -45,3 +45,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# agent tooling / generated agent instructions
+.claude/
+.agents/
+skills-lock.json
+frontend/AGENTS.md
+frontend/CLAUDE.md
+
+# supabase CLI local state
+supabase/.temp/

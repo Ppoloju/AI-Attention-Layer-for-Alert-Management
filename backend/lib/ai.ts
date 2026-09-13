@@ -12,7 +12,10 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY || '',
 });
 
-const MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+// Default must be a model the account can actually reach — check
+// GET https://api.groq.com/openai/v1/models if triage starts failing with
+// "model_not_found". `llama-3.1-8b-instant` was retired and no longer resolves.
+const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -118,7 +121,10 @@ export async function groqTriage(input: TriageInput): Promise<TriageResult | nul
       model: MODEL,
       messages,
       temperature: 0.3,
-      max_tokens: 512,
+      // Reasoning models spend part of this budget on hidden reasoning tokens
+      // before emitting the JSON, so 512 truncates longer triage responses
+      // (which surfaces as a "failed_generation" error and skipped triage).
+      max_tokens: 1024,
       response_format: { type: 'json_object' },
     });
 
