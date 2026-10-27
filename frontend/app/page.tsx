@@ -67,6 +67,7 @@ export default function Dashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [usingDemoData, setUsingDemoData] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
@@ -102,6 +103,9 @@ export default function Dashboard() {
 
       setSignals(signalsData.signals || []);
       setStats(statsData);
+      setUsingDemoData(
+        signalsData.dataSource === 'demo' || statsData.dataSource === 'demo'
+      );
       setFetchedAt(Date.now());
       setError(null);
     } catch (err) {
@@ -154,7 +158,10 @@ export default function Dashboard() {
         const res = await fetch(`/api/signals/${selectedSignalId}`);
         if (!res.ok) throw new Error('Unable to load signal details.');
         const data = await res.json();
-        if (!cancelled) setDrawerSignal(data.signal);
+        if (!cancelled) {
+          setDrawerSignal(data.signal);
+          if (data.dataSource === 'demo') setUsingDemoData(true);
+        }
       } catch (err) {
         console.error('Error fetching signal details:', err);
         if (!cancelled) {
@@ -186,7 +193,10 @@ export default function Dashboard() {
         body: JSON.stringify({ status: nextStatus }),
       });
 
-      if (!res.ok) throw new Error('Failed to update status');
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update status');
+      }
 
       // Optimistic state update in signals list
       setSignals(prev => prev.map(s => s.id === id ? { ...s, status: nextStatus } : s));
@@ -269,6 +279,17 @@ export default function Dashboard() {
           <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400 flex items-center gap-3">
             <AlertOctagon className="h-5 w-5 shrink-0" />
             <p>{error}</p>
+          </div>
+        )}
+        {usingDemoData && (
+          <div role="status" className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+            <AlertOctagon className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Demo data — PostgreSQL is unavailable</p>
+              <p className="mt-1 text-amber-100/80">
+                The signals and statistics below are examples, not live data. Signal status changes are disabled and cannot be saved.
+              </p>
+            </div>
           </div>
         )}
         {actionError && (
@@ -461,7 +482,7 @@ export default function Dashboard() {
                       timeAgo={formatTimeAgo(fetchedAt, signal.start_time)}
                       aiSummary={signal.ai_hypothesis || "No AI summary generated for this correlation yet."}
                       status={signal.status}
-                      onResolve={() => handleResolveSignal(signal.id, signal.status)}
+                      onResolve={usingDemoData ? undefined : () => handleResolveSignal(signal.id, signal.status)}
                       onInvestigate={() => setSelectedSignalId(signal.id)}
                     />
                   </div>
@@ -583,8 +604,12 @@ export default function Dashboard() {
                 </div>
                 <button
                   onClick={() => handleResolveSignal(drawerSignal.id, drawerSignal.status)}
+                  disabled={usingDemoData}
+                  title={usingDemoData ? 'Status changes are disabled while showing demo data.' : undefined}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
-                    drawerSignal.status === 'resolved'
+                    usingDemoData
+                      ? 'bg-zinc-900 border border-zinc-800 text-zinc-500 cursor-not-allowed'
+                      : drawerSignal.status === 'resolved'
                       ? 'bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300'
                       : 'bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-600/10'
                   }`}
