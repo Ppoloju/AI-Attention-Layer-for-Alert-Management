@@ -21,6 +21,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.warn('Database offline, returning mock signals:', error);
     const mockSignals = getMockSignals();
-    return NextResponse.json({ signals: mockSignals });
+    return NextResponse.json({
+      signals: mockSignals,
+      dataSource: 'demo',
+      warning: 'PostgreSQL is unavailable. These demo signals are not live data.',
+    });
   }
 }
