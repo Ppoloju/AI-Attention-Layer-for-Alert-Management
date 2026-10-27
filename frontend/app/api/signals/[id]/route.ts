@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSignalById, updateSignalStatus } from '../../../../../shared/lib/db';
-import { getMockSignalById, updateMockSignalStatus } from '../../mock-store';
+import { getMockSignalById } from '../../mock-store';
 
 export async function GET(
   request: NextRequest,
@@ -36,7 +36,11 @@ export async function GET(
         { status: 404 }
       );
     }
-    return NextResponse.json({ signal: mockSignal });
+    return NextResponse.json({
+      signal: mockSignal,
+      dataSource: 'demo',
+      warning: 'PostgreSQL is unavailable. This demo signal is not live data.',
+    });
   }
 }
 
@@ -44,7 +48,6 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  let status: string | undefined;
   let id: string | undefined;
 
   try {
@@ -59,7 +62,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    status = body.status;
+    const status = body.status;
 
     if (!status || (status !== 'open' && status !== 'resolved')) {
       return NextResponse.json(
@@ -68,7 +71,19 @@ export async function PATCH(
       );
     }
 
-    const updatedSignal = await updateSignalStatus(id, status);
+    let updatedSignal;
+    try {
+      updatedSignal = await updateSignalStatus(id, status);
+    } catch (error) {
+      console.error('Unable to persist signal status:', error);
+      return NextResponse.json(
+        {
+          error: 'Signal status could not be saved because PostgreSQL is unavailable.',
+          dataSource: 'demo',
+        },
+        { status: 503 }
+      );
+    }
 
     if (!updatedSignal) {
       return NextResponse.json(
@@ -79,29 +94,10 @@ export async function PATCH(
 
     return NextResponse.json({ signal: updatedSignal });
   } catch (error) {
-    console.warn('Database offline, updating status in mock store for ID:', error);
-    
-    if (!id) {
-      return NextResponse.json(
-        { error: 'Signal ID is required' },
-        { status: 400 }
-      );
-    }
-
-    if (!status || (status !== 'open' && status !== 'resolved')) {
-      return NextResponse.json(
-        { error: 'Invalid status. Must be "open" or "resolved".' },
-        { status: 400 }
-      );
-    }
-
-    const updatedSignal = updateMockSignalStatus(id, status as 'open' | 'resolved');
-    if (!updatedSignal) {
-      return NextResponse.json(
-        { error: 'Signal not found' },
-        { status: 404 }
-      );
-    }
-    return NextResponse.json({ signal: updatedSignal });
+    console.error(`Unable to update signal ${id ?? '(unknown)'}:`, error);
+    return NextResponse.json(
+      { error: 'Unable to update signal status.' },
+      { status: 500 }
+    );
   }
 }
