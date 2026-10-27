@@ -70,7 +70,7 @@ skipped gracefully when no API key is configured or the provider is unavailable.
   so the dashboard remains fully interactive.
 - **Health endpoint** — reports provider selection and health for Redis, Postgres, Supabase, and the queue backlog.
 - **Dual infrastructure** — local Docker (Postgres + Redis) or managed cloud (Supabase + Upstash), selected by env vars.
-- **Unit tests** — 44 Vitest cases covering correlation, scoring, triage, and env detection.
+- **Unit tests** — 47 Vitest cases covering correlation, scoring, triage, and env detection.
 
 ## Tech stack
 
@@ -270,6 +270,7 @@ All variables are read from the monorepo root `.env` (loaded by `shared/lib/load
 | `USE_LOCAL_DATABASE` / `USE_SUPABASE_DATABASE` | No | Force the database target (`true`). Ignored in production. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | No | Upstash Redis (production queue). Takes precedence when both are set. |
 | `REDIS_URL` | No | Local Redis connection (default `redis://localhost:6379`). |
+| `USE_LOCAL_REDIS` | No | Set to `true` to use local Redis even when Upstash credentials are configured. |
 | `POSTGRES_PORT` | No | Host port published by `docker-compose.yml` for Postgres (default `5432`). Override it when another project on the machine already holds 5432, and keep `DB_PORT` in sync. |
 | `GROQ_API_KEY` | No | Enables AI triage. When absent, triage is skipped and everything else works. |
 | `GROQ_MODEL` | No | Groq model id (default `openai/gpt-oss-120b`). Verify the account can reach it via `GET https://api.groq.com/openai/v1/models` — retired models return `model_not_found` at triage time. |
@@ -280,9 +281,11 @@ All variables are read from the monorepo root `.env` (loaded by `shared/lib/load
 
 ### Provider selection
 
-- **Database:** local Docker when `USE_LOCAL_DATABASE=true`, or when `DB_*`/`SUPABASE_DB_*` are present and not in
-  production; otherwise `DATABASE_URL`.
-- **Queue:** Upstash when both Upstash vars are set; otherwise local Redis via `REDIS_URL`.
+- **Database:** `USE_LOCAL_DATABASE=true` and `USE_SUPABASE_DATABASE=true` explicitly select a target.
+  Otherwise, `DATABASE_URL` takes precedence, followed by a configured remote `SUPABASE_DB_HOST`; local
+  `DB_*` settings select Docker Postgres during development.
+- **Queue:** `USE_LOCAL_REDIS=true` selects local Redis; otherwise Upstash is used when both Upstash vars are set,
+  falling back to local Redis via `REDIS_URL`.
 - `GET /api/health` reports which providers were selected and whether each one is reachable.
 
 ## API reference
