@@ -69,6 +69,7 @@ export default function SignalDetailPage() {
   const id = params.id as string;
 
   const [signal, setSignal] = useState<SignalDetail | null>(null);
+  const [usingDemoData, setUsingDemoData] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,7 +80,10 @@ export default function SignalDetailPage() {
         if (!r.ok) throw new Error('Signal not found');
         return r.json();
       })
-      .then(data => setSignal(data.signal))
+      .then(data => {
+        setSignal(data.signal);
+        setUsingDemoData(data.dataSource === 'demo');
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, [id]);
@@ -114,6 +118,15 @@ export default function SignalDetailPage() {
         <Link href="/" className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 mb-6 inline-flex items-center gap-2 font-medium transition-colors">
           ← Back to Dashboard
         </Link>
+
+        {usingDemoData && (
+          <div role="status" className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
+            <p className="font-semibold">Demo data — PostgreSQL is unavailable</p>
+            <p className="mt-1">
+              This signal is an example, not live data. Changes cannot be saved while the database is unavailable.
+            </p>
+          </div>
+        )}
 
         {/* Header */}
         <div className="flex items-start gap-4 mb-8">
