@@ -1,5 +1,6 @@
 import { Redis as UpstashRedis } from '@upstash/redis';
 import Redis from 'ioredis';
+import { getRedisProvider } from '../../shared/lib/providers';
 import type { Event as SignalEvent } from '../../shared/schemas/event';
 
 const QUEUE_NAME = 'events:queue';
@@ -21,7 +22,7 @@ function createRedisClient(): RedisClient {
   const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
   const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-  if (upstashUrl && upstashToken) {
+  if (getRedisProvider() === 'upstash' && upstashUrl && upstashToken) {
     const client = new UpstashRedis({
       url: upstashUrl,
       token: upstashToken,
