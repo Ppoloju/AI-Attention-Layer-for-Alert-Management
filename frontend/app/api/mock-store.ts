@@ -220,15 +220,6 @@ export function getMockSignalById(id: string) {
   };
 }
 
-export function updateMockSignalStatus(id: string, status: 'open' | 'resolved') {
-  const index = mockSignals.findIndex(s => s.id === id);
-  if (index !== -1) {
-    mockSignals[index].status = status;
-    return mockSignals[index];
-  }
-  return null;
-}
-
 export function getMockStats() {
   const totalSignals = mockSignals.length;
   const resolvedSignals = mockSignals.filter(s => s.status === 'resolved').length;
