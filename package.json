@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "db:up": "docker-compose up -d postgres redis",
-    "db:down": "docker-compose down",
+    "db:up": "docker compose up -d postgres redis",
+    "db:down": "docker compose down",
     "dev": "concurrently \"npm run frontend:dev\" \"npm run backend:worker\"",
     "dev:full": "npm run dev",
     "start": "cd frontend && npm run start",
