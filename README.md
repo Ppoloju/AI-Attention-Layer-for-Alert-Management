@@ -66,11 +66,11 @@ skipped gracefully when no API key is configured or the provider is unavailable.
 - **Reactive dashboard** — live search, All/Active/Resolved tabs, and P0–P3 priority chips, all client-side.
 - **Slide-over review sheet** — inspect AI triage, evidence, next steps, and the raw event timeline without leaving the page.
 - **Signal lifecycle** — mark signals resolved/reopened from the card or the drawer (`PATCH /api/signals/[id]`).
-- **Offline fail-safe** — if Postgres is unreachable, the signals/detail/stats routes serve a built-in demo dataset
-  so the dashboard remains fully interactive.
+- **Visible offline fallback** — if Postgres is unreachable, fallback API responses identify demo data, the dashboard
+  and signal detail page show a warning, and signal status changes are disabled.
 - **Health endpoint** — reports provider selection and health for Redis, Postgres, Supabase, and the queue backlog.
 - **Dual infrastructure** — local Docker (Postgres + Redis) or managed cloud (Supabase + Upstash), selected by env vars.
-- **Unit tests** — 47 Vitest cases covering correlation, scoring, triage, and env detection.
+- **Unit tests** — 52 Vitest cases covering correlation, scoring, triage, and env detection.
 
 ## Tech stack
 
@@ -254,8 +254,9 @@ curl -X POST http://localhost:3000/api/events \
 
 Two compatible events for the same service inside 5 minutes produce a correlated **signal** on the dashboard.
 
-> No database running? The dashboard still works: `/api/signals`, `/api/signals/[id]`, and `/api/stats` fall back to a
-> built-in demo dataset when the database is unreachable.
+> No database running? `/api/signals`, `/api/signals/[id]`, and `/api/stats` fall back to a built-in demo dataset
+> and include `"dataSource": "demo"` in their JSON responses. The dashboard labels the data as examples and disables
+> status changes; the API rejects status updates with `503` until PostgreSQL is available.
 
 ## Configuration
 
@@ -275,9 +276,10 @@ All variables are read from the monorepo root `.env` (loaded by `shared/lib/load
 | `GROQ_API_KEY` | No | Enables AI triage. When absent, triage is skipped and everything else works. |
 | `GROQ_MODEL` | No | Groq model id (default `openai/gpt-oss-120b`). Verify the account can reach it via `GET https://api.groq.com/openai/v1/models` — retired models return `model_not_found` at triage time. |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | No | Supabase auth/session support in the frontend. |
-| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWKS_URL` | No | Server-side Supabase equivalents. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | No | Legacy public anon-key alias for Supabase auth. |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWKS_URL` | No | Server-side Supabase equivalents. Secret keys are used only for server health checks. |
 
-\* A database is required for real data, but the dashboard degrades to the in-memory demo dataset without one.
+\* A database is required for real data. Without one, the dashboard clearly labels its demo-data fallback.
 
 ### Provider selection
 
@@ -286,6 +288,7 @@ All variables are read from the monorepo root `.env` (loaded by `shared/lib/load
   `DB_*` settings select Docker Postgres during development.
 - **Queue:** `USE_LOCAL_REDIS=true` selects local Redis; otherwise Upstash is used when both Upstash vars are set,
   falling back to local Redis via `REDIS_URL`.
+- Existing process/deployment environment variables take precedence over values loaded from the root `.env` file.
 - `GET /api/health` reports which providers were selected and whether each one is reachable.
 
 ## API reference
@@ -325,12 +328,13 @@ Returns `{ "events": [...] }`. `limit` must be between 1 and 1000.
 ### `GET /api/signals?limit=50`
 
 Returns `{ "signals": [...] }` ordered by `risk_score DESC, created_at DESC`, including `priority`, `status`,
-`event_count`, `max_severity`, and the AI triage summary fields. Falls back to the demo dataset when the database
-is unreachable.
+`event_count`, `max_severity`, and the AI triage summary fields. When the database is unreachable, the response
+includes `"dataSource": "demo"` and a warning with the demo dataset.
 
 ### `GET /api/signals/[id]`
 
 Returns `{ "signal": { ..., "events": [ ... ] } }` with the correlated events in timestamp order; `404` when unknown.
+When the database is unreachable, includes `"dataSource": "demo"` and a warning.
 
 ### `PATCH /api/signals/[id]`
 
@@ -339,6 +343,7 @@ Returns `{ "signal": { ..., "events": [ ... ] } }` with the correlated events in
 ```
 
 Accepts `open` or `resolved`, returning the updated signal; `400` for any other value.
+Returns `503` if PostgreSQL is unavailable and the change cannot be persisted.
 
 ### `GET /api/stats`
 
