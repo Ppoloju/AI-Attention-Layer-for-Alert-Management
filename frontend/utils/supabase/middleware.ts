@@ -1,8 +1,10 @@
 import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_SECRET_KEY;
+import {
+  getSupabaseHealthKey,
+  getSupabasePublishableKey,
+  getSupabaseUrl,
+} from '../../../shared/lib/providers';
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -10,6 +12,9 @@ export async function updateSession(request: NextRequest) {
       headers: request.headers,
     },
   });
+
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabasePublishableKey();
 
   if (!supabaseUrl || !supabaseKey) {
     return supabaseResponse;
@@ -36,10 +41,13 @@ export async function updateSession(request: NextRequest) {
 }
 
 export async function checkSupabaseHealth(): Promise<boolean> {
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabaseHealthKey();
+
   if (!supabaseUrl || !supabaseKey) return false;
 
   try {
-    const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+    const response = await fetch(`${supabaseUrl.replace(/\/+$/, '')}/rest/v1/`, {
       headers: {
         apikey: supabaseKey,
         Authorization: `Bearer ${supabaseKey}`,
