@@ -1,13 +1,23 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_SECRET_KEY;
+import {
+  getSupabasePublishableKey,
+  getSupabaseUrl,
+} from "../../../shared/lib/providers";
 
 export const createClient = (cookieStore: Awaited<ReturnType<typeof cookies>>) => {
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabasePublishableKey();
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error(
+      'Supabase server client requires a Supabase URL and publishable or anon key.'
+    );
+  }
+
   return createServerClient(
-    supabaseUrl!,
-    supabaseKey!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll() {
