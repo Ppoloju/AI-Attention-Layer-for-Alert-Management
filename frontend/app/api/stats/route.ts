@@ -9,6 +9,10 @@ export async function GET() {
   } catch (error) {
     console.warn('Database offline, returning mock stats:', error);
     const mockStats = getMockStats();
-    return NextResponse.json(mockStats);
+    return NextResponse.json({
+      ...mockStats,
+      dataSource: 'demo',
+      warning: 'PostgreSQL is unavailable. These demo statistics are not live data.',
+    });
   }
 }
