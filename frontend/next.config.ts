@@ -3,7 +3,7 @@ import path from "path";
 import { config as loadEnv } from "dotenv";
 
 // Load monorepo root .env (Supabase, Upstash, Groq, DATABASE_URL)
-loadEnv({ path: path.resolve(__dirname, "../.env"), override: true });
+loadEnv({ path: path.resolve(__dirname, "../.env"), override: false });
 
 const nextConfig: NextConfig = {
   /* config options here */
