@@ -14,7 +14,13 @@ loadRootEnv();
 export function shouldUseLocalDatabase(): boolean {
   if (process.env.USE_LOCAL_DATABASE === 'true') return true;
   if (process.env.USE_SUPABASE_DATABASE === 'true') return false;
+  if (process.env.DATABASE_URL) return false;
   if (process.env.NODE_ENV === 'production') return false;
+
+  const supabaseDbHost = process.env.SUPABASE_DB_HOST || '';
+  if (supabaseDbHost && !/localhost|127\.0\.0\.1/.test(supabaseDbHost)) {
+    return false;
+  }
 
   const hasLocalDbConfig = Boolean(
     process.env.DB_HOST ||
@@ -25,7 +31,6 @@ export function shouldUseLocalDatabase(): boolean {
 
   if (hasLocalDbConfig) return true;
 
-  const supabaseDbHost = process.env.SUPABASE_DB_HOST || '';
   return /localhost|127\.0\.0\.1/.test(supabaseDbHost);
 }
 
@@ -43,6 +48,21 @@ function getDatabaseUrl(): string | undefined {
   }
 
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+
+  const supabaseHost = process.env.SUPABASE_DB_HOST;
+  if (supabaseHost) {
+    const user = process.env.SUPABASE_DB_USER || 'postgres';
+    const password = process.env.SUPABASE_DB_PASSWORD || '';
+    const db = process.env.SUPABASE_DB_NAME || 'postgres';
+    const port = process.env.SUPABASE_DB_PORT || '5432';
+    return `postgresql://${user}:${encodeURIComponent(password)}@${supabaseHost}:${port}/${db}`;
+  }
+
+  if (process.env.USE_SUPABASE_DATABASE === 'true') {
+    throw new Error(
+      'USE_SUPABASE_DATABASE=true requires DATABASE_URL or SUPABASE_DB_HOST.'
+    );
+  }
 
   return undefined;
 }
