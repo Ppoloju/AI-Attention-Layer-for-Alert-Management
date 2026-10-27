@@ -1,13 +1,33 @@
-export type DatabaseProvider = 'supabase' | 'local';
+export type DatabaseProvider = 'supabase' | 'postgres' | 'local';
 export type RedisProvider = 'upstash' | 'local';
 
 export function getDatabaseProvider(): DatabaseProvider {
-  const url = process.env.DATABASE_URL ?? '';
-  if (/supabase\.co/i.test(url)) return 'supabase';
+  if (process.env.USE_LOCAL_DATABASE === 'true') return 'local';
+
+  const databaseUrl = process.env.DATABASE_URL ?? '';
+  if (/supabase\.co/i.test(databaseUrl)) return 'supabase';
+  if (databaseUrl) {
+    return /localhost|127\.0\.0\.1/i.test(databaseUrl) ? 'local' : 'postgres';
+  }
+
+  if (process.env.USE_SUPABASE_DATABASE === 'true') return 'supabase';
+
+  const supabaseDbHost = process.env.SUPABASE_DB_HOST ?? '';
+  if (supabaseDbHost && !/localhost|127\.0\.0\.1/i.test(supabaseDbHost)) {
+    return 'supabase';
+  }
+
+  const databaseHost = process.env.DB_HOST ?? '';
+  if (databaseHost && !/localhost|127\.0\.0\.1/i.test(databaseHost)) {
+    return 'postgres';
+  }
+
   return 'local';
 }
 
 export function getRedisProvider(): RedisProvider {
+  if (process.env.USE_LOCAL_REDIS === 'true') return 'local';
+
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
     return 'upstash';
   }
