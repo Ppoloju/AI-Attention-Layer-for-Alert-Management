@@ -1,11 +1,28 @@
 export type DatabaseProvider = 'supabase' | 'postgres' | 'local';
 export type RedisProvider = 'upstash' | 'local';
 
+export function getSupabaseUrl(): string | undefined {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+}
+
+export function getSupabasePublishableKey(): string | undefined {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_ANON_KEY
+  );
+}
+
+export function getSupabaseHealthKey(): string | undefined {
+  return getSupabasePublishableKey() || process.env.SUPABASE_SECRET_KEY;
+}
+
 export function getDatabaseProvider(): DatabaseProvider {
   if (process.env.USE_LOCAL_DATABASE === 'true') return 'local';
 
   const databaseUrl = process.env.DATABASE_URL ?? '';
-  if (/supabase\.co/i.test(databaseUrl)) return 'supabase';
+  if (/supabase\.(?:co|com)/i.test(databaseUrl)) return 'supabase';
   if (databaseUrl) {
     return /localhost|127\.0\.0\.1/i.test(databaseUrl) ? 'local' : 'postgres';
   }
@@ -35,8 +52,8 @@ export function getRedisProvider(): RedisProvider {
 }
 
 export function isSupabaseConfigured(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabaseHealthKey();
   return Boolean(url && key);
 }
 
