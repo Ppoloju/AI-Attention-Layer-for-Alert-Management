@@ -66,7 +66,9 @@ export default function Dashboard() {
     noiseReduction: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
 
   // ─── Filtering State ────────────────────────────────────────────────────────
@@ -84,6 +86,7 @@ export default function Dashboard() {
   // ─── Fetching Data ──────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
+    setRefreshing(true);
     try {
       const [signalsRes, statsRes] = await Promise.all([
         fetch('/api/signals?limit=50'),
@@ -106,6 +109,7 @@ export default function Dashboard() {
       setError(err instanceof Error ? err.message : 'An error occurred while loading data.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -125,7 +129,19 @@ export default function Dashboard() {
   const closeDrawer = useCallback(() => {
     setSelectedSignalId(null);
     setDrawerSignal(null);
+    setActionError(null);
   }, []);
+
+  useEffect(() => {
+    if (!selectedSignalId) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeDrawer();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [closeDrawer, selectedSignalId]);
 
   useEffect(() => {
     if (!selectedSignalId) return;
@@ -136,12 +152,14 @@ export default function Dashboard() {
       setDrawerLoading(true);
       try {
         const res = await fetch(`/api/signals/${selectedSignalId}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled) setDrawerSignal(data.signal);
-        }
+        if (!res.ok) throw new Error('Unable to load signal details.');
+        const data = await res.json();
+        if (!cancelled) setDrawerSignal(data.signal);
       } catch (err) {
         console.error('Error fetching signal details:', err);
+        if (!cancelled) {
+          setActionError(err instanceof Error ? err.message : 'Unable to load signal details.');
+        }
       } finally {
         if (!cancelled) setDrawerLoading(false);
       }
@@ -158,6 +176,7 @@ export default function Dashboard() {
 
   const handleResolveSignal = async (id: string, currentStatus: string) => {
     const nextStatus = currentStatus === 'resolved' ? 'open' : 'resolved';
+    setActionError(null);
     try {
       const res = await fetch(`/api/signals/${id}`, {
         method: 'PATCH',
@@ -188,6 +207,7 @@ export default function Dashboard() {
       fetchData();
     } catch (err) {
       console.error('Error resolving signal:', err);
+      setActionError(err instanceof Error ? err.message : 'Unable to update signal status.');
     }
   };
 
@@ -196,7 +216,8 @@ export default function Dashboard() {
   const filteredSignals = signals.filter(signal => {
     const matchesSearch = searchQuery === '' || 
       signal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      signal.service.toLowerCase().includes(searchQuery.toLowerCase());
+      signal.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      signal.representative_message.toLowerCase().includes(searchQuery.toLowerCase());
       
     const matchesStatus = statusFilter === 'all' || 
       (statusFilter === 'open' && signal.status === 'open') ||
@@ -227,14 +248,16 @@ export default function Dashboard() {
           <div className="flex items-center gap-4 text-xs font-semibold text-zinc-400">
             <button 
               onClick={fetchData} 
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 transition-colors"
+              disabled={refreshing}
+              aria-label="Refresh dashboard data"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:cursor-wait disabled:opacity-60 border border-zinc-800 text-zinc-300 transition-colors"
             >
-              <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-              Sync
+              <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing' : 'Refresh'}
             </button>
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-              Live Ingestion Active
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              Auto-refresh · 10s
             </span>
           </div>
         </div>
@@ -246,6 +269,14 @@ export default function Dashboard() {
           <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400 flex items-center gap-3">
             <AlertOctagon className="h-5 w-5 shrink-0" />
             <p>{error}</p>
+          </div>
+        )}
+        {actionError && (
+          <div role="alert" className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-300">
+            <p>{actionError}</p>
+            <button onClick={() => setActionError(null)} aria-label="Dismiss message" className="rounded-lg p-1 text-amber-200/70 transition-colors hover:text-amber-100">
+              <X className="h-4 w-4" />
+            </button>
           </div>
         )}
 
@@ -317,6 +348,7 @@ export default function Dashboard() {
                 <input 
                   type="text" 
                   placeholder="Search signals, services..." 
+                  aria-label="Search signals by name, service, or message"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition-colors"
@@ -336,9 +368,10 @@ export default function Dashboard() {
                     <button
                       key={status}
                       onClick={() => setStatusFilter(status)}
+                      aria-pressed={statusFilter === status}
                       className={`py-1.5 text-[10px] font-bold rounded-lg capitalize transition-colors ${
                         statusFilter === status 
-                          ? 'bg-zinc-850 text-white shadow-sm' 
+                          ? 'bg-zinc-800 text-white shadow-sm'
                           : 'text-zinc-500 hover:text-zinc-300'
                       }`}
                     >
@@ -356,6 +389,7 @@ export default function Dashboard() {
                     <button
                       key={priority}
                       onClick={() => setPriorityFilter(priority)}
+                      aria-pressed={priorityFilter === priority}
                       className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors ${
                         priorityFilter === priority 
                           ? 'bg-zinc-100 text-zinc-950 border-zinc-100 shadow-sm' 
@@ -403,7 +437,7 @@ export default function Dashboard() {
                 {(searchQuery || statusFilter !== 'all' || priorityFilter !== 'all') && (
                   <button 
                     onClick={() => { setSearchQuery(''); setStatusFilter('all'); setPriorityFilter('all'); }} 
-                    className="mt-4 px-4 py-2 rounded-xl text-xs bg-zinc-850 hover:bg-zinc-800 text-zinc-300 border border-zinc-850"
+                    className="mt-4 px-4 py-2 rounded-xl text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-800"
                   >
                     Reset All Filters
                   </button>
@@ -480,7 +514,7 @@ export default function Dashboard() {
       )}
 
       {/* Sheet panel */}
-      <div className={`fixed inset-y-0 right-0 w-full sm:w-[520px] bg-zinc-950 border-l border-zinc-900 shadow-2xl z-50 transform transition-transform duration-300 ease-out flex flex-col ${
+      <div role="dialog" aria-modal="true" aria-label="Signal detail review" aria-hidden={!selectedSignalId} inert={!selectedSignalId} className={`fixed inset-y-0 right-0 w-full sm:w-[520px] bg-zinc-950 border-l border-zinc-900 shadow-2xl z-50 transform transition-transform duration-300 ease-out flex flex-col ${
         selectedSignalId ? 'translate-x-0' : 'translate-x-full'
       }`}>
         
@@ -494,7 +528,7 @@ export default function Dashboard() {
           </div>
           <button 
             onClick={closeDrawer}
-            className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
           >
             <X className="h-4.5 w-4.5" />
           </button>
@@ -551,7 +585,7 @@ export default function Dashboard() {
                   onClick={() => handleResolveSignal(drawerSignal.id, drawerSignal.status)}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
                     drawerSignal.status === 'resolved'
-                      ? 'bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-300'
+                      ? 'bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300'
                       : 'bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-600/10'
                   }`}
                 >
