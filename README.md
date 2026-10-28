@@ -70,7 +70,7 @@ skipped gracefully when no API key is configured or the provider is unavailable.
   and signal detail page show a warning, and signal status changes are disabled.
 - **Health endpoint** — reports provider selection and health for Redis, Postgres, Supabase, and the queue backlog.
 - **Dual infrastructure** — local Docker (Postgres + Redis) or managed cloud (Supabase + Upstash), selected by env vars.
-- **Unit tests** — 52 Vitest cases covering correlation, scoring, triage, and env detection.
+- **Unit tests** — 53 Vitest cases covering correlation, scoring, triage, and env detection.
 
 ## Tech stack
 
@@ -263,6 +263,31 @@ Two compatible events for the same service inside 5 minutes produce a correlated
 All variables are read from the monorepo root `.env` (loaded by `shared/lib/load-env.ts` and by
 `frontend/next.config.ts` for the Next.js server).
 
+### Configure Supabase
+
+Supabase Auth/API and the PostgreSQL database connection are separate settings:
+
+1. In Supabase, open **Connect** and copy the project URL and publishable key into the root `.env`:
+
+   ```dotenv
+   NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_KEY
+   ```
+
+   Existing projects may use `NEXT_PUBLIC_SUPABASE_ANON_KEY` instead. Never put a secret or service-role key in a
+   `NEXT_PUBLIC_*` variable.
+2. To use Supabase as the app database, copy its PostgreSQL connection string from **Connect** into `DATABASE_URL`.
+   Use the pooler connection string if your deployment host cannot connect to Supabase's direct database address.
+   If `USE_LOCAL_DATABASE=true` is set, remove it or set it to `false` so it does not override `DATABASE_URL`.
+3. Add the same variables to your deployment platform's environment settings for every environment you deploy, then
+   redeploy so the Next.js build receives the public variables. Keep database passwords and Supabase secret keys in
+   server-only variables; never commit `.env`.
+4. Open `/api/health`. `services.supabase` checks the Supabase Data API; `services.database` checks PostgreSQL
+   connectivity. `diagnostics.supabase` reports a safe HTTP status and next step for Supabase configuration errors.
+
+The health check confirms API reachability, not that users can sign in. This project currently refreshes Supabase
+session cookies, but does not yet include a sign-in UI or protect API routes with authorization checks.
+
 | Variable | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL` | No* | Full Postgres connection string (Supabase or any hosted Postgres). Takes precedence over `DB_*`. |
@@ -367,12 +392,14 @@ Returns `503` if PostgreSQL is unavailable and the change cannot be persisted.
   "version": "1.0.0",
   "providers": { "database": "local", "redis": "upstash", "groq": "configured", "supabase": "configured" },
   "services": { "redis": "healthy", "database": "healthy", "supabase": "healthy" },
+  "diagnostics": { "supabase": { "ok": true, "statusCode": 200, "message": "Supabase Data API is reachable." } },
   "queue": { "pending": 0 },
   "timestamp": "2026-08-29T10:00:00.000Z"
 }
 ```
 
-`status` is `ok` when every *configured* service is healthy, `degraded` otherwise.
+`status` is `ok` when every *configured* service is healthy, `degraded` otherwise. Supabase errors in
+`diagnostics.supabase` distinguish missing configuration, rejected keys, incorrect project URLs, and network failures.
 
 ## Core services
 
@@ -479,6 +506,11 @@ curl http://localhost:3000/api/health   # verify providers and connectivity
 **Database connection errors / dashboard shows demo data.** Check `DATABASE_URL` or the `DB_*` values, then make sure
 the database is actually reachable. With Docker: `npm run db:up`. The dashboard intentionally falls back to the demo
 dataset instead of failing, so this is easy to miss — check `/api/health`.
+
+**Supabase reports `unhealthy`.** Check `/api/health` → `diagnostics.supabase`. Verify the URL is the project's
+Supabase API URL (not the PostgreSQL hostname), the publishable/anon key belongs to that project, and the Data API is
+enabled. If only `services.database` is unhealthy, configure the PostgreSQL connection string separately as
+`DATABASE_URL` and make sure `USE_LOCAL_DATABASE` is not set to `true`.
 
 **Worker exits right after start.** `initializeDatabase()` runs before the poll loop, so the worker stops if the
 database is unreachable at boot. Fix the database connection and restart it.
