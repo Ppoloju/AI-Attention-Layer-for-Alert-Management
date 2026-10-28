@@ -13,7 +13,7 @@ export async function GET() {
   const queue = new EventQueue();
 
   try {
-    const [redisHealthy, dbHealthy, supabaseHealthy, queueSize] = await Promise.all([
+    const [redisHealthy, dbHealthy, supabaseHealth, queueSize] = await Promise.all([
       queue.healthCheck(),
       healthCheck(),
       isSupabaseConfigured() ? checkSupabaseHealth() : Promise.resolve(null),
@@ -24,7 +24,7 @@ export async function GET() {
       redis: redisHealthy ? 'healthy' : 'unhealthy',
       database: dbHealthy ? 'healthy' : 'unhealthy',
       supabase: isSupabaseConfigured()
-        ? supabaseHealthy
+        ? supabaseHealth?.ok
           ? 'healthy'
           : 'unhealthy'
         : 'not_configured',
@@ -33,7 +33,7 @@ export async function GET() {
     const allHealthy =
       redisHealthy &&
       dbHealthy &&
-      (!isSupabaseConfigured() || supabaseHealthy === true);
+      (!isSupabaseConfigured() || supabaseHealth?.ok === true);
 
     return NextResponse.json({
       status: allHealthy ? 'ok' : 'degraded',
@@ -45,6 +45,13 @@ export async function GET() {
         supabase: isSupabaseConfigured() ? 'configured' : 'not_configured',
       },
       services,
+      diagnostics: {
+        supabase: supabaseHealth ?? {
+          ok: false,
+          statusCode: null,
+          message: 'Set the Supabase project URL and API key to enable this check.',
+        },
+      },
       queue: {
         pending: queueSize,
       },
