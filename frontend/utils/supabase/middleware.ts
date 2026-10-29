@@ -13,17 +13,40 @@ export interface SupabaseHealthResult {
 }
 
 export async function updateSession(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const isIngestionRequest = pathname === '/api/events' && request.method === 'POST';
+  const isPublicRoute = pathname === '/login' || pathname === '/api/health' || isIngestionRequest;
+
+  if (isPublicRoute) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
     },
   });
 
-  const supabaseUrl = getSupabaseUrl();
-  const supabaseKey = getSupabasePublishableKey();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    return supabaseResponse;
+    if (process.env.NODE_ENV !== 'production') {
+      return supabaseResponse;
+    }
+
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Supabase authentication is not configured.' },
+        { status: 503 }
+      );
+    }
+
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    return NextResponse.redirect(loginUrl);
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -41,7 +64,25 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  if (error) {
+    console.error('Supabase session validation failed:', error.name);
+    return NextResponse.json(
+      { error: 'Unable to validate the current session.' },
+      { status: 503 }
+    );
+  }
+
+  if (!user) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+    }
+
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    return NextResponse.redirect(loginUrl);
+  }
 
   return supabaseResponse;
 }
