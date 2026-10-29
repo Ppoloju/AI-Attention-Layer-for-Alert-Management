@@ -78,6 +78,7 @@ function createPool() {
 
     return new Pool({
       connectionString: databaseUrl,
+      connectionTimeoutMillis: 5_000,
       ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
     });
   }
@@ -89,6 +90,7 @@ function createPool() {
     database: process.env.DB_NAME || 'signalflow',
     user: process.env.DB_USER || 'signalflow',
     password: process.env.DB_PASSWORD || 'signalflow_password',
+    connectionTimeoutMillis: 5_000,
   });
 }
 
