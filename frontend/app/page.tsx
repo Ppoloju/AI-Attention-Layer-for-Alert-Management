@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Bell, ShieldAlert, CheckCircle2, AlertOctagon, HelpCircle,
   Search, X, RefreshCw, Filter, Shield
 } from 'lucide-react';
 import SignalAlertCard from '../components/SignalAlertCard';
+import { createClient as createSupabaseClient } from '../utils/supabase/client';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -57,6 +59,7 @@ function formatTimeAgo(now: number | null, iso: string): string {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [signals, setSignals] = useState<Signal[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalEvents: 0,
@@ -83,10 +86,19 @@ export default function Dashboard() {
   const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
   const [drawerSignal, setDrawerSignal] = useState<Signal | null>(null);
   const [drawerLoading, setDrawerLoading] = useState(false);
+  const isFetchingRef = useRef(false);
+  const hasSupabaseAuth = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  );
 
   // ─── Fetching Data ──────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
+    if (isFetchingRef.current) return;
+
+    isFetchingRef.current = true;
     setRefreshing(true);
     try {
       const [signalsRes, statsRes] = await Promise.all([
@@ -112,6 +124,7 @@ export default function Dashboard() {
       console.error(err);
       setError(err instanceof Error ? err.message : 'An error occurred while loading data.');
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
       setRefreshing(false);
     }
@@ -211,6 +224,18 @@ export default function Dashboard() {
           resolvedSignals: isResolvedNow ? prev.resolvedSignals + 1 : prev.resolvedSignals - 1,
           openSignals: isResolvedNow ? prev.openSignals - 1 : prev.openSignals + 1,
         };
+
+        const handleSignOut = async () => {
+          try {
+            const { error } = await createSupabaseClient().auth.signOut();
+            if (error) throw error;
+            router.replace('/login');
+            router.refresh();
+          } catch {
+            console.error('Unable to sign out of Supabase.');
+            setActionError('Unable to sign out. Please try again.');
+          }
+        };
       });
 
       // Fetch fresh data in background to ensure sync
@@ -269,6 +294,14 @@ export default function Dashboard() {
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               Auto-refresh · 10s
             </span>
+            {hasSupabaseAuth && (
+              <button
+                onClick={handleSignOut}
+                className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-zinc-300 transition-colors hover:bg-zinc-800"
+              >
+                Sign out
+              </button>
+            )}
           </div>
         </div>
       </nav>
