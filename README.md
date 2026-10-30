@@ -4,7 +4,7 @@ SignalFlow is an AI-powered attention layer for operational incident management.
 multiple sources, correlates them into signals, scores each signal deterministically, and adds an AI triage
 recommendation so responders know **what to look at first** and **what to do next**.
 
-**Status:** v1.0.0 — feature complete (ingestion → correlation → scoring → AI triage → dashboard), 44 unit tests passing.
+**Status:** v1.0.0 — feature complete (ingestion → correlation → scoring → AI triage → dashboard), 63 unit tests passing.
 
 ---
 
@@ -57,7 +57,7 @@ skipped gracefully when no API key is configured or the provider is unavailable.
 
 ## Features
 
-- **Event ingestion API** — validated with Zod (`POST /api/events`), acknowledged with `202` and processed asynchronously.
+- **Event ingestion API** — validated with Zod, protected by a server-only API key, acknowledged with `202`, and processed asynchronously.
 - **Correlation engine** — groups events for the same service inside a 5-minute window, using event-type compatibility
   and shared keywords. Two or more related events become one signal.
 - **Deterministic risk scoring** — explainable 0–100 score from severity, event volume, event-type diversity, and burst rate.
@@ -66,11 +66,12 @@ skipped gracefully when no API key is configured or the provider is unavailable.
 - **Reactive dashboard** — live search, All/Active/Resolved tabs, and P0–P3 priority chips, all client-side.
 - **Slide-over review sheet** — inspect AI triage, evidence, next steps, and the raw event timeline without leaving the page.
 - **Signal lifecycle** — mark signals resolved/reopened from the card or the drawer (`PATCH /api/signals/[id]`).
+- **Authentication** — Supabase sign-in protects dashboard and data APIs; local development remains available without auth configuration.
 - **Visible offline fallback** — if Postgres is unreachable, fallback API responses identify demo data, the dashboard
   and signal detail page show a warning, and signal status changes are disabled.
 - **Health endpoint** — reports provider selection and health for Redis, Postgres, Supabase, and the queue backlog.
 - **Dual infrastructure** — local Docker (Postgres + Redis) or managed cloud (Supabase + Upstash), selected by env vars.
-- **Unit tests** — 52 Vitest cases covering correlation, scoring, triage, and env detection.
+- **Unit tests** — 63 Vitest cases covering correlation, scoring, triage, validation, authentication, and env detection.
 
 ## Tech stack
 
@@ -263,6 +264,37 @@ Two compatible events for the same service inside 5 minutes produce a correlated
 All variables are read from the monorepo root `.env` (loaded by `shared/lib/load-env.ts` and by
 `frontend/next.config.ts` for the Next.js server).
 
+### Configure Supabase
+
+Supabase Auth/API and the PostgreSQL database connection are separate settings:
+
+1. In Supabase, open **Connect** and copy the project URL and publishable key into the root `.env`:
+
+   ```dotenv
+   NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_KEY
+   ```
+
+   Existing projects may use `NEXT_PUBLIC_SUPABASE_ANON_KEY` instead. Never put a secret or service-role key in a
+   `NEXT_PUBLIC_*` variable.
+2. Create operator accounts in Supabase Auth; the application provides sign-in but does not enable public
+   self-registration.
+3. Generate a strong random `EVENT_INGESTION_API_KEY` with
+   `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` and configure it as a server-only
+   environment variable. Event sources must send this key in an Authorization Bearer header; never expose it in browser
+   code.
+4. To use Supabase as the app database, copy its PostgreSQL connection string from **Connect** into `DATABASE_URL`.
+   Use the pooler connection string if your deployment host cannot connect to Supabase's direct database address.
+   If `USE_LOCAL_DATABASE=true` is set, remove it or set it to `false` so it does not override `DATABASE_URL`.
+5. Add the same variables to your deployment platform's environment settings for every environment you deploy, then
+   redeploy so the Next.js build receives the public variables. Keep database passwords and Supabase secret keys in
+   server-only variables; never commit `.env`.
+6. Open `/api/health`. `services.supabase` checks the Supabase Data API; `services.database` checks PostgreSQL
+   connectivity. `diagnostics.supabase` reports a safe HTTP status and next step for Supabase configuration errors.
+
+The health check confirms API reachability, not that users can sign in. Create operator accounts in Supabase Auth;
+the application provides sign-in but does not enable public self-registration.
+
 | Variable | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL` | No* | Full Postgres connection string (Supabase or any hosted Postgres). Takes precedence over `DB_*`. |
@@ -275,8 +307,9 @@ All variables are read from the monorepo root `.env` (loaded by `shared/lib/load
 | `POSTGRES_PORT` | No | Host port published by `docker-compose.yml` for Postgres (default `5432`). Override it when another project on the machine already holds 5432, and keep `DB_PORT` in sync. |
 | `GROQ_API_KEY` | No | Enables AI triage. When absent, triage is skipped and everything else works. |
 | `GROQ_MODEL` | No | Groq model id (default `openai/gpt-oss-120b`). Verify the account can reach it via `GET https://api.groq.com/openai/v1/models` — retired models return `model_not_found` at triage time. |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | No | Supabase auth/session support in the frontend. |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes for production | Supabase Auth for dashboard and data API sessions. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | No | Legacy public anon-key alias for Supabase auth. |
+| `EVENT_INGESTION_API_KEY` | Yes for event ingestion | Server-only bearer key required by `POST /api/events`. |
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWKS_URL` | No | Server-side Supabase equivalents. Secret keys are used only for server health checks. |
 
 \* A database is required for real data. Without one, the dashboard clearly labels its demo-data fallback.
@@ -291,11 +324,17 @@ All variables are read from the monorepo root `.env` (loaded by `shared/lib/load
 - Existing process/deployment environment variables take precedence over values loaded from the root `.env` file.
 - `GET /api/health` reports which providers were selected and whether each one is reachable.
 
+All dashboard pages and data APIs except `/api/health` require a valid Supabase session. Unauthenticated page requests
+redirect to `/login`; unauthenticated API requests receive `401`. `POST /api/events` is protected separately with
+`EVENT_INGESTION_API_KEY`. In local development only, Supabase protection is bypassed when its public auth settings
+are absent; configure Supabase before exposing a deployment.
+
 ## API reference
 
 ### `POST /api/events`
 
-Validate an event and enqueue it for asynchronous processing.
+Validate an event and enqueue it for asynchronous processing. Requires
+`Authorization: Bearer <EVENT_INGESTION_API_KEY>`.
 
 ```json
 {
@@ -312,24 +351,27 @@ Validate an event and enqueue it for asynchronous processing.
 | Field | Type | Notes |
 |---|---|---|
 | `source` | enum | `github` · `slack` · `jira` · `prometheus` · `custom` |
-| `event_type` | string | Free-form, e.g. `alert`, `deploy`, `error`, `latency` |
-| `service` | string | Used as the correlation key |
+| `event_type` | string | 1–100 characters, e.g. `alert`, `deploy`, `error`, `latency` |
+| `service` | string | 1–100 characters; used as the correlation key |
 | `severity` | enum | `low` · `medium` · `high` · `critical` |
-| `message` | string | Human-readable description |
-| `metadata` | object | Optional, defaults to `{}` |
+| `message` | string | 1–10,000 characters; human-readable description |
+| `metadata` | object | Optional, defaults to `{}`; at most 50 top-level keys and 32 KB |
 | `timestamp` | string | ISO-8601 datetime |
 
-Responses: `202 { "message": "Event accepted", "event": { ... } }` · `400` with Zod issue details · `500` on failure.
+The request body is limited to 64 KB. Responses: `202 { "message": "Event accepted", "event": { ... } }` · `400` for invalid JSON or schema
+issues · `401` for a missing/invalid key · `413` when the body exceeds the limit · `500` on queue failure · `503` when
+`EVENT_INGESTION_API_KEY` is not configured.
 
 ### `GET /api/events?limit=50`
 
-Returns `{ "events": [...] }`. `limit` must be between 1 and 1000.
+Returns `{ "events": [...] }`. `limit` must be an integer between 1 and 1000.
 
 ### `GET /api/signals?limit=50`
 
 Returns `{ "signals": [...] }` ordered by `risk_score DESC, created_at DESC`, including `priority`, `status`,
 `event_count`, `max_severity`, and the AI triage summary fields. When the database is unreachable, the response
 includes `"dataSource": "demo"` and a warning with the demo dataset.
+`limit` must be an integer between 1 and 1000.
 
 ### `GET /api/signals/[id]`
 
@@ -367,12 +409,14 @@ Returns `503` if PostgreSQL is unavailable and the change cannot be persisted.
   "version": "1.0.0",
   "providers": { "database": "local", "redis": "upstash", "groq": "configured", "supabase": "configured" },
   "services": { "redis": "healthy", "database": "healthy", "supabase": "healthy" },
+  "diagnostics": { "supabase": { "ok": true, "statusCode": 200, "message": "Supabase Data API is reachable." } },
   "queue": { "pending": 0 },
   "timestamp": "2026-08-29T10:00:00.000Z"
 }
 ```
 
-`status` is `ok` when every *configured* service is healthy, `degraded` otherwise.
+`status` is `ok` when every *configured* service is healthy, `degraded` otherwise. Supabase errors in
+`diagnostics.supabase` distinguish missing configuration, rejected keys, incorrect project URLs, and network failures.
 
 ## Core services
 
@@ -405,7 +449,7 @@ worker simply skips enrichment — the deterministic score is never blocked or r
 
 ## Not yet implemented
 
-The four capabilities below appear in the project's description but have no implementation in this repository.
+The capabilities below appear in the project's description but have no implementation in this repository.
 None of them are partially built — treat each as absent rather than unfinished.
 
 **Routing signals to the responsible team.** A signal carries no owner, assignee, or escalation target. There is no
@@ -413,14 +457,12 @@ None of them are partially built — treat each as absent rather than unfinished
 attention" — deciding who acts on it is left to the reader.
 
 **External source integrations.** `POST /api/events` is the only ingress. There are no webhook receivers, so GitHub,
-Slack, Jira, and Prometheus cannot call SignalFlow directly; you must write the caller that normalizes their payloads
-into the event schema. The endpoint also performs no authentication or signature verification, so anyone who can reach
-it can write events.
+Slack, Jira, and Prometheus callers must normalize their payloads and send the configured bearer key. Provider-specific
+webhook signature verification and separate per-source credentials are not implemented.
 
-**Authentication and authorization.** `frontend/utils/supabase/` provides browser and server Supabase client helpers,
-and `proxy.ts` refreshes session cookies on every request — but the result of `getUser()` is discarded, and no page or
-API route checks a session or returns `401`/`403`. Every endpoint, including `PATCH /api/signals/[id]`, is open. Only
-the session refresher is wired up; `utils/supabase/client.ts` and `server.ts` are unused.
+**Authorization granularity.** Supabase sessions protect dashboard and data APIs, and event ingestion uses a separate
+server-only bearer key. There are no role-based permissions or per-user ownership checks: every signed-in operator can
+read and update all signals, and every holder of the ingestion key can submit events.
 
 **Operator feedback loop.** Resolving a signal (`PATCH /api/signals/[id]`) only flips a `status` string. No resolution
 outcome, acknowledgement, or false-positive flag is recorded, and nothing is fed back into correlation, scoring, or
@@ -480,8 +522,16 @@ curl http://localhost:3000/api/health   # verify providers and connectivity
 the database is actually reachable. With Docker: `npm run db:up`. The dashboard intentionally falls back to the demo
 dataset instead of failing, so this is easy to miss — check `/api/health`.
 
+**Supabase reports `unhealthy`.** Check `/api/health` → `diagnostics.supabase`. Verify the URL is the project's
+Supabase API URL (not the PostgreSQL hostname), the publishable/anon key belongs to that project, and the Data API is
+enabled. If only `services.database` is unhealthy, configure the PostgreSQL connection string separately as
+`DATABASE_URL` and make sure `USE_LOCAL_DATABASE` is not set to `true`.
+
 **Worker exits right after start.** `initializeDatabase()` runs before the poll loop, so the worker stops if the
 database is unreachable at boot. Fix the database connection and restart it.
+
+**Worker cannot reach PostgreSQL.** Connections now time out after five seconds so the worker/API can report the
+failure instead of waiting indefinitely. Events whose database insert fails are put back on the Redis queue and retried.
 
 **Redis connection errors.** Verify the Upstash URL/token pair, or that local Redis is running (`redis-cli ping`).
 `POST /api/events` returns `500` if the queue cannot be reached.

@@ -174,17 +174,45 @@ describe('Supabase environment detection', () => {
       process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co/';
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'publishable-key';
 
-      await expect(checkSupabaseHealth()).resolves.toBe(true);
+      const health = await checkSupabaseHealth();
+      expect(health).toEqual({
+        ok: true,
+        statusCode: 200,
+        message: 'Supabase Data API is reachable.',
+      });
+      expect(JSON.stringify(health)).not.toContain('publishable-key');
       expect(fetch).toHaveBeenCalledWith(
         'https://example.supabase.co/rest/v1/',
         expect.objectContaining({
           headers: {
             apikey: 'publishable-key',
-            Authorization: 'Bearer publishable-key',
           },
           cache: 'no-store',
         })
       );
+    } finally {
+      fetch.mockRestore();
+      process.env = previousEnv;
+    }
+  });
+
+  it('explains rejected Supabase API keys without exposing their values', async () => {
+    const previousEnv = { ...process.env };
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(null, { status: 401 })
+    );
+
+    try {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'test-secret-value';
+
+      const health = await checkSupabaseHealth();
+      expect(health).toEqual({
+        ok: false,
+        statusCode: 401,
+        message: 'Supabase rejected the API key. Check that it belongs to this project and is active.',
+      });
+      expect(JSON.stringify(health)).not.toContain('test-secret-value');
     } finally {
       fetch.mockRestore();
       process.env = previousEnv;

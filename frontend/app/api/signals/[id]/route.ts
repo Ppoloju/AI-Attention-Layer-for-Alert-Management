@@ -61,8 +61,34 @@ export async function PATCH(
       );
     }
 
-    const body = await request.json();
-    const status = body.status;
+    const contentLength = Number(request.headers.get('content-length'));
+    if (Number.isFinite(contentLength) && contentLength > 1024) {
+      return NextResponse.json(
+        { error: 'Request body must be no larger than 1 KB.' },
+        { status: 413 }
+      );
+    }
+
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > 1024) {
+      return NextResponse.json(
+        { error: 'Request body must be no larger than 1 KB.' },
+        { status: 413 }
+      );
+    }
+
+    let body: unknown;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: 'Request body must be valid JSON.' }, { status: 400 });
+    }
+
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Request body must be a JSON object.' }, { status: 400 });
+    }
+
+    const status = 'status' in body ? body.status : undefined;
 
     if (!status || (status !== 'open' && status !== 'resolved')) {
       return NextResponse.json(

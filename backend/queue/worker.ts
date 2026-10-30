@@ -18,23 +18,23 @@ import { triageSignal, type SignalForTriage } from '../services/triage';
 const queue = new EventQueue();
 const POLL_INTERVAL = 1000; // 1 second
 
-async function processEvent(event: any) {
+async function processEvent(event: unknown): Promise<boolean> {
+  const validationResult = EventSchema.safeParse(event);
+
+  if (!validationResult.success) {
+    console.error('Invalid event:', validationResult.error.issues);
+    return true;
+  }
+
   try {
-    const validationResult = EventSchema.safeParse(event);
-
-    if (!validationResult.success) {
-      console.error('Invalid event:', validationResult.error.issues);
-      return;
-    }
-
-    // 1. Persist the event
     const persistedEvent = await insertEvent(validationResult.data);
     console.log(`Event persisted: ${persistedEvent.id} ${persistedEvent.event_type}`);
 
-    // 2. Run correlation on recent events for this service
     await runCorrelation(persistedEvent.service);
+    return true;
   } catch (error) {
     console.error('Error processing event:', error);
+    return false;
   }
 }
 
@@ -133,7 +133,15 @@ async function startWorker() {
       const event = await queue.dequeue();
 
       if (event) {
-        await processEvent(event);
+        const processed = await processEvent(event);
+
+        if (!processed) {
+          const validationResult = EventSchema.safeParse(event);
+          if (validationResult.success) {
+            await queue.enqueue(validationResult.data);
+          }
+          await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+        }
       } else {
         await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
       }
