@@ -63,7 +63,11 @@ function createRedisClient(): RedisClient {
 
   // Local Docker — ioredis
   console.log('Using local Redis (ioredis)');
-  return new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+  const client = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+  client.on('error', (error: Error) => {
+    console.error('Redis connection error:', error.message || error.name);
+  });
+  return client;
 }
 
 // ─── EventQueue ──────────────────────────────────────────────────────────────

@@ -2,7 +2,6 @@ import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 import {
   getSupabaseHealthKey,
-  getSupabasePublishableKey,
   getSupabaseUrl,
 } from '../../../shared/lib/providers';
 

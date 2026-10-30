@@ -194,6 +194,18 @@ export default function Dashboard() {
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
 
+  const handleSignOut = async () => {
+    try {
+      const { error } = await createSupabaseClient().auth.signOut();
+      if (error) throw error;
+      router.replace('/login');
+      router.refresh();
+    } catch (error) {
+      console.error('Unable to sign out of Supabase:', error);
+      setActionError('Unable to sign out. Please try again.');
+    }
+  };
+
   const handleResolveSignal = async (id: string, currentStatus: string) => {
     const nextStatus = currentStatus === 'resolved' ? 'open' : 'resolved';
     setActionError(null);
@@ -223,18 +235,6 @@ export default function Dashboard() {
           ...prev,
           resolvedSignals: isResolvedNow ? prev.resolvedSignals + 1 : prev.resolvedSignals - 1,
           openSignals: isResolvedNow ? prev.openSignals - 1 : prev.openSignals + 1,
-        };
-
-        const handleSignOut = async () => {
-          try {
-            const { error } = await createSupabaseClient().auth.signOut();
-            if (error) throw error;
-            router.replace('/login');
-            router.refresh();
-          } catch {
-            console.error('Unable to sign out of Supabase.');
-            setActionError('Unable to sign out. Please try again.');
-          }
         };
       });
 
